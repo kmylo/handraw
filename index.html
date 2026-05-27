@@ -134,6 +134,9 @@ background-size:auto,auto,32px 32px,32px 32px}
 <script type="text/babel">
 const { useState, useEffect, useRef, useCallback } = React;
 
+const defaultHand = 'Right';
+const defaultMode = 'single';
+
 const PALETTE = [
   '#ffffff','#c4c4c4','#888888','#444444','#111111',
   '#f87171','#fb923c','#fbbf24','#a3e635','#34d399',
@@ -188,10 +191,11 @@ function floodFill(ctx,sx,sy,fillColor){
 
 // ── Pure gesture detectors (module-level = stable, never re-created) ─────────
 
-// Mode: pinch — thumb tip (4) + index tip (8) close together = draw
-function isPinching(lm) {
+// Returns raw 3D distance between thumb tip (4) and index tip (8)
+// Z is in the same normalized space as X/Y — not perfect depth but good enough
+function pinchDistance3D(lm) {
   const t = lm[4], i = lm[8];
-  return Math.hypot(i.x - t.x, i.y - t.y) < 0.05;
+  return Math.hypot(i.x - t.x, i.y - t.y, (i.z || 0) - (t.z || 0));
 }
 
 // Mode: open — 3+ fingers extended above their PIP joint = draw
@@ -204,19 +208,11 @@ function isHandOpen(lm) {
 
 // Mode: single — only index finger extended (index up, middle/ring/pinky down)
 function isIndexOnly(lm) {
-  const indexUp  = lm[8].y  < lm[6].y;
+  const indexUp    = lm[8].y  < lm[6].y;
   const middleDown = lm[12].y > lm[10].y;
   const ringDown   = lm[16].y > lm[14].y;
   const pinkyDown  = lm[20].y > lm[18].y;
   return indexUp && middleDown && ringDown && pinkyDown;
-}
-
-// Unified: decide "is drawing active?" based on mode + which hand landmark to test
-function isDrawing(lm, mode) {
-  if (mode === 'pinch')  return isPinching(lm);
-  if (mode === 'open')   return isHandOpen(lm);
-  if (mode === 'single') return isIndexOnly(lm);
-  return false;
 }
 
 // ── Skeleton + indicator drawing (pure, module-level) ─────────────────────────
@@ -291,8 +287,8 @@ function App() {
   const [activeId, setActiveId] = useState('l1');
   const [showSkel, setShowSkel] = useState(true);
   const [showCam,  setShowCam]  = useState(true);
-  const [drawHand, setDrawHand] = useState('Right');
-  const [ctrlMode, setCtrlMode] = useState('single');
+  const [drawHand, setDrawHand] = useState(defaultHand);
+  const [ctrlMode, setCtrlMode] = useState(defaultMode);
   const [handStatus, setHandStatus] = useState({
     drawDetected: false, ctrlDetected: false, drawing: false,
   });
@@ -465,6 +461,64 @@ function App() {
       return lm && lm.length === 21 && lm.every(p => p && typeof p.x === 'number');
     }
 
+    // ── Stateful gesture resolver — hysteresis + debounce ──────────────────────
+    // Lives inside the closure so state persists across frames without re-renders.
+    //
+    // Hysteresis thresholds for pinch (3D distance):
+    //   PINCH_ON  — must be BELOW this to activate   (tighter = fewer false starts)
+    //   PINCH_OFF — must be ABOVE this to deactivate  (wider gap = stable hold)
+    // The gap between them is the "dead zone" that prevents flicker at the boundary.
+    const PINCH_ON  = 0.045; // fingers clearly touching
+    const PINCH_OFF = 0.075; // fingers clearly apart (60% wider than ON threshold)
+    const DEBOUNCE_FRAMES = 3; // signal must hold N consecutive frames to change state
+
+    // Per-hand gesture state (keyed by label so it survives hand-index swaps)
+    const gestureState = {
+      Left:  { active: false, confirmCount: 0, pendingState: false },
+      Right: { active: false, confirmCount: 0, pendingState: false },
+    };
+
+    // Returns the debounced, hysteretic gesture boolean for a given landmark set
+    function resolveGesture(lm, mode, label) {
+      const gs = gestureState[label] || (gestureState[label] = { active: false, confirmCount: 0, pendingState: false });
+
+      let rawSignal;
+      if (mode === 'pinch') {
+        const dist = pinchDistance3D(lm);
+        // Hysteresis: use different thresholds depending on current state
+        if (!gs.active) {
+          rawSignal = dist < PINCH_ON;   // need to be clearly closed to start
+        } else {
+          rawSignal = dist < PINCH_OFF;  // stay active until clearly open
+        }
+      } else if (mode === 'open') {
+        rawSignal = isHandOpen(lm);
+      } else {
+        rawSignal = isIndexOnly(lm);
+      }
+
+      // Debounce: only flip state after DEBOUNCE_FRAMES consecutive consistent frames
+      if (rawSignal === gs.pendingState) {
+        gs.confirmCount++;
+        if (gs.confirmCount >= DEBOUNCE_FRAMES && rawSignal !== gs.active) {
+          gs.active = rawSignal;
+        }
+      } else {
+        // Signal changed direction — reset counter with new pending state
+        gs.pendingState = rawSignal;
+        gs.confirmCount = 1;
+      }
+
+      return gs.active;
+    }
+
+    // Reset gesture state when hands disappear
+    function resetGestureState() {
+      ['Left','Right'].forEach(l => {
+        gestureState[l] = { active: false, confirmCount: 0, pendingState: false };
+      });
+    }
+
     const hands = new Hands({
       locateFile: f => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${f}`
     });
@@ -489,8 +543,9 @@ function App() {
       const mode = ctrlModeRef.current;
 
       if (!results.multiHandLandmarks?.length) {
-        // Clear smoother state so next appearance seeds fresh
+        // Clear smoother + gesture state so next appearance seeds fresh
         delete smoothed['Left']; delete smoothed['Right'];
+        resetGestureState();
         setHandStatus({drawDetected:false, ctrlDetected:false, drawing:false});
         ovCtx.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
         const cc = cursorRef.current; if (cc) cc.getContext('2d').clearRect(0,0,cc.width,cc.height);
@@ -502,20 +557,22 @@ function App() {
       // Track which labels are active this frame; clear stale smoother entries
       const activeLabels = new Set();
       results.multiHandedness.forEach(hd => activeLabels.add(hd.label));
-      ['Left','Right'].forEach(l => { if (!activeLabels.has(l)) delete smoothed[l]; });
+      ['Left','Right'].forEach(l => { if (!activeLabels.has(l)) { delete smoothed[l]; gestureState[l] = { active:false, confirmCount:0, pendingState:false }; } });
 
       // Map hands by user perspective — smoothed, keyed by MediaPipe label
       let drawLM = null, ctrlLM = null;
+      let drawLabel = null, ctrlLabel = null;
       results.multiHandedness.forEach((hd, idx) => {
         const userSide = hd.label === 'Left' ? 'Right' : 'Left'; // mirror correction
         const raw = results.multiHandLandmarks[idx];
         const lm = smoothLandmarks(hd.label, raw); // key by label, not idx
         if (!validLM(lm)) return; // skip this hand if landmarks are bad
-        if (userSide === drawHandRef.current) drawLM = lm;
-        else ctrlLM = lm;
+        if (userSide === drawHandRef.current) { drawLM = lm; drawLabel = hd.label; }
+        else { ctrlLM = lm; ctrlLabel = hd.label; }
       });
 
-      const effectiveCtrlLM = mode === 'single' ? drawLM : ctrlLM;
+      const effectiveCtrlLM    = mode === 'single' ? drawLM    : ctrlLM;
+      const effectiveCtrlLabel = mode === 'single' ? drawLabel : ctrlLabel;
 
       // Draw skeletons — only if landmarks are valid
       if (validLM(drawLM)) {
@@ -529,17 +586,22 @@ function App() {
           showSkelRef.current);
       }
 
-      // Gesture detection — guarded
+      // Gesture detection — hysteresis + debounce, then draw indicator
+      const shouldDraw = validLM(effectiveCtrlLM) && effectiveCtrlLabel
+        ? resolveGesture(effectiveCtrlLM, mode, effectiveCtrlLabel)
+        : false;
+
       if (validLM(effectiveCtrlLM)) {
-        const active = isDrawing(effectiveCtrlLM, mode);
-        drawCtrlIndicatorFn(octx, effectiveCtrlLM, w, h, active, mode);
+        // Pass raw signal (pre-debounce) to indicator so it feels responsive visually
+        const rawActive = mode === 'pinch'
+          ? pinchDistance3D(effectiveCtrlLM) < PINCH_OFF
+          : (mode === 'open' ? isHandOpen(effectiveCtrlLM) : isIndexOnly(effectiveCtrlLM));
+        drawCtrlIndicatorFn(octx, effectiveCtrlLM, w, h, rawActive, mode);
       }
 
       // Atomic blit
       ovCtx.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
       ovCtx.drawImage(buf, 0, 0);
-
-      const shouldDraw = validLM(effectiveCtrlLM) ? isDrawing(effectiveCtrlLM, mode) : false;
 
       setHandStatus({
         drawDetected: validLM(drawLM),
