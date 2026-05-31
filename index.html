@@ -1,2701 +1,674 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Finger Paint Studio</title>
-    <script src="https://cdn.jsdelivr.net/npm/react@18/umd/react.development.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/react-dom@18/umd/react-dom.development.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@babel/standalone/babel.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
-    <link
-      href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;600&family=Syne:wght@700;800&display=swap"
-      rel="stylesheet"
-    />
-    <style>
-      *,
-      *::before,
-      *::after {
-        box-sizing: border-box;
-        margin: 0;
-        padding: 0;
-      }
-      :root {
-        --bg: #0a0a0f;
-        --surface: #12121a;
-        --surface2: #1a1a26;
-        --border: rgba(255, 255, 255, 0.08);
-        --border-hi: rgba(255, 255, 255, 0.18);
-        --accent: #7c6af7;
-        --accent2: #f76a8a;
-        --text: #f0eeff;
-        --muted: rgba(240, 238, 255, 0.42);
-        --green: #4ade80;
-        --red: #f87171;
-        --yellow: #fbbf24;
-      }
-      html,
-      body,
-      #root {
-        width: 100%;
-        height: 100%;
-        overflow: hidden;
-        background: var(--bg);
-      }
-      body {
-        font-family: 'JetBrains Mono', monospace;
-        color: var(--text);
-      }
-      .app {
-        display: grid;
-        grid-template-columns: 1fr 296px;
-        grid-template-rows: 48px 1fr 34px;
-        height: 100vh;
-        width: 100vw;
-      }
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Finger Paint Studio</title>
+<script src="https://cdn.jsdelivr.net/npm/react@18/umd/react.development.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/react-dom@18/umd/react-dom.development.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@babel/standalone/babel.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;600&family=Syne:wght@700;800&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0a0a0f;--surface:#12121a;--surface2:#1a1a26;
+  --border:rgba(255,255,255,0.08);--border-hi:rgba(255,255,255,0.18);
+  --accent:#7c6af7;--accent2:#f76a8a;
+  --text:#f0eeff;--muted:rgba(240,238,255,0.42);
+  --green:#4ade80;--red:#f87171;--yellow:#fbbf24;
+}
+html,body,#root{width:100%;height:100%;overflow:hidden;background:var(--bg)}
+body{font-family:'JetBrains Mono',monospace;color:var(--text)}
+.app{display:grid;grid-template-columns:1fr 296px;grid-template-rows:48px 1fr 34px;height:100vh;width:100vw}
 
-      .topbar {
-        grid-column: 1/-1;
-        grid-row: 1;
-        display: flex;
-        align-items: center;
-        padding: 0 16px;
-        gap: 10px;
-        border-bottom: 1px solid var(--border);
-        background: var(--surface);
-        z-index: 20;
-      }
-      .logo {
-        font-family: 'Syne', sans-serif;
-        font-weight: 800;
-        font-size: 14px;
-        letter-spacing: -0.5px;
-        background: linear-gradient(135deg, var(--accent), var(--accent2));
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-        background-clip: text;
-        white-space: nowrap;
-      }
-      .sep {
-        width: 1px;
-        height: 20px;
-        background: var(--border);
-      }
-      .spacer {
-        flex: 1;
-      }
-      .tbtn {
-        display: flex;
-        align-items: center;
-        gap: 5px;
-        padding: 4px 10px;
-        border-radius: 5px;
-        border: 1px solid var(--border);
-        background: transparent;
-        color: var(--muted);
-        font-family: 'JetBrains Mono', monospace;
-        font-size: 11px;
-        cursor: pointer;
-        transition: all 0.15s;
-      }
-      .tbtn:hover {
-        border-color: var(--border-hi);
-        color: var(--text);
-        background: var(--surface2);
-      }
-      .tbtn:disabled {
-        opacity: 0.3;
-        cursor: not-allowed;
-        pointer-events: none;
-      }
-      .tbtn.danger:hover {
-        border-color: var(--red);
-        color: var(--red);
-      }
-      .tbtn.ok:hover {
-        border-color: var(--green);
-        color: var(--green);
-      }
-      .tbtn.undo-redo {
-        position: relative;
-      }
-      .tbtn.undo-redo .hist-badge {
-        position: absolute;
-        top: -5px;
-        right: -5px;
-        background: var(--accent);
-        color: white;
-        font-size: 8px;
-        width: 14px;
-        height: 14px;
-        border-radius: 50%;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-weight: 600;
-      }
-      .pill {
-        display: flex;
-        align-items: center;
-        gap: 6px;
-        padding: 4px 10px;
-        border-radius: 20px;
-        border: 1px solid var(--border);
-        font-size: 10px;
-        letter-spacing: 0.4px;
-        transition: all 0.3s;
-      }
-      .dot {
-        width: 6px;
-        height: 6px;
-        border-radius: 50%;
-        animation: pdot 1.5s ease-in-out infinite;
-      }
-      @keyframes pdot {
-        0%,
-        100% {
-          opacity: 0.5;
-          transform: scale(0.9);
-        }
-        50% {
-          opacity: 1;
-          transform: scale(1.1);
-        }
-      }
+/* ── Loading overlay ── */
+.lo{position:fixed;inset:0;z-index:1000;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;transition:opacity .5s,visibility .5s}
+.lo.gone{opacity:0;visibility:hidden;pointer-events:none}
+.lo-logo{font-family:'Syne',sans-serif;font-weight:800;font-size:26px;letter-spacing:-1px;background:linear-gradient(135deg,var(--accent),var(--accent2));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;margin-bottom:36px;animation:lp 2s ease-in-out infinite}
+@keyframes lp{0%,100%{opacity:.8}50%{opacity:1}}
+.lo-stages{display:flex;flex-direction:column;gap:8px;width:300px;margin-bottom:28px}
+.lo-stage{display:flex;align-items:center;gap:12px;padding:10px 14px;border-radius:8px;border:1px solid var(--border);background:var(--surface);transition:all .35s;opacity:.3}
+.lo-stage.sa{opacity:1;border-color:rgba(124,106,247,.55);background:rgba(124,106,247,.08)}
+.lo-stage.sd{opacity:.65;border-color:rgba(74,222,128,.3);background:rgba(74,222,128,.04)}
+.lo-icon{font-size:15px;width:20px;text-align:center;flex-shrink:0}
+.lo-lbl{flex:1;font-size:11px}
+.lo-badge{font-size:9px;padding:2px 7px;border-radius:10px;border:1px solid transparent;flex-shrink:0}
+.sa .lo-badge{color:var(--accent);border-color:rgba(124,106,247,.4);background:rgba(124,106,247,.1)}
+.sd .lo-badge{color:var(--green);border-color:rgba(74,222,128,.35);background:rgba(74,222,128,.07)}
+.lo-stage:not(.sa):not(.sd) .lo-badge{color:var(--muted)}
+.lo-spin{width:12px;height:12px;flex-shrink:0;border:2px solid rgba(124,106,247,.25);border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite}
+.lo-check{width:12px;height:12px;flex-shrink:0;color:var(--green);font-size:11px;font-weight:700}
+.lo-dot{width:12px;height:12px;flex-shrink:0;border:1.5px solid rgba(255,255,255,.12);border-radius:50%}
+@keyframes spin{to{transform:rotate(360deg)}}
+.lo-bar-wrap{width:300px;height:3px;background:var(--surface2);border-radius:2px;overflow:hidden;margin-bottom:18px}
+.lo-bar{height:100%;background:linear-gradient(90deg,var(--accent),var(--accent2));border-radius:2px;transition:width .5s}
+.lo-tip{font-size:10px;color:var(--muted);letter-spacing:.4px;animation:tf 3s ease-in-out infinite}
+@keyframes tf{0%,100%{opacity:.4}50%{opacity:.9}}
+/* PiP loading badge */
+.pip-loading{position:absolute;bottom:7px;left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:5px;background:rgba(10,10,15,.88);border:1px solid rgba(124,106,247,.4);border-radius:12px;padding:3px 10px;font-size:9px;color:var(--accent);white-space:nowrap;pointer-events:none;transition:opacity .4s}
+.pip-loading.gone{opacity:0}
+.pip-loading .ms{width:7px;height:7px;border:1.5px solid rgba(124,106,247,.3);border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite;flex-shrink:0}
 
-      .toolbar-tools {
-        display: flex;
-        align-items: center;
-        gap: 2px;
-        padding: 0 4px;
-      }
-      .tbtn2 {
-        height: 32px;
-        padding: 0 8px;
-        display: flex;
-        align-items: center;
-        gap: 5px;
-        border-radius: 7px;
-        border: 1px solid transparent;
-        background: transparent;
-        color: var(--muted);
-        cursor: pointer;
-        font-size: 15px;
-        transition: all 0.15s;
-        flex-shrink: 0;
-        font-family: 'JetBrains Mono', monospace;
-      }
-      .tbtn2:hover {
-        background: var(--surface2);
-        color: var(--text);
-      }
-      .tbtn2.active {
-        background: var(--surface2);
-        border-color: var(--accent);
-        color: var(--accent);
-        box-shadow: 0 0 0 1px var(--accent) inset,
-          0 0 12px rgba(124, 106, 247, 0.2);
-      }
-      .tbtn2 .tlbl {
-        font-size: 9px;
-        letter-spacing: 0.3px;
-        opacity: 0.8;
-      }
-      .tsep {
-        width: 1px;
-        height: 20px;
-        background: var(--border);
-        margin: 0 4px;
-        flex-shrink: 0;
-      }
+.topbar{grid-column:1/-1;grid-row:1;display:flex;align-items:center;padding:0 16px;gap:10px;border-bottom:1px solid var(--border);background:var(--surface);z-index:20}
+.logo{font-family:'Syne',sans-serif;font-weight:800;font-size:14px;letter-spacing:-.5px;background:linear-gradient(135deg,var(--accent),var(--accent2));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;white-space:nowrap}
+.sep{width:1px;height:20px;background:var(--border)}
+.spacer{flex:1}
+.tbtn{display:flex;align-items:center;gap:5px;padding:4px 10px;border-radius:5px;border:1px solid var(--border);background:transparent;color:var(--muted);font-family:'JetBrains Mono',monospace;font-size:11px;cursor:pointer;transition:all .15s}
+.tbtn:hover{border-color:var(--border-hi);color:var(--text);background:var(--surface2)}
+.tbtn:disabled{opacity:.3;cursor:not-allowed;pointer-events:none}
+.tbtn.danger:hover{border-color:var(--red);color:var(--red)}
+.tbtn.ok:hover{border-color:var(--green);color:var(--green)}
+.tbtn.ur{position:relative}
+.tbtn.ur .hb{position:absolute;top:-5px;right:-5px;background:var(--accent);color:white;font-size:8px;width:14px;height:14px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:600}
+.pill{display:flex;align-items:center;gap:6px;padding:4px 10px;border-radius:20px;border:1px solid var(--border);font-size:10px;letter-spacing:.4px;transition:all .3s}
+.dot{width:6px;height:6px;border-radius:50%;animation:pdot 1.5s ease-in-out infinite}
+@keyframes pdot{0%,100%{opacity:.5;transform:scale(.9)}50%{opacity:1;transform:scale(1.1)}}
+.toolbar-tools{display:flex;align-items:center;gap:2px;padding:0 4px}
+.tbtn2{height:32px;padding:0 8px;display:flex;align-items:center;gap:5px;border-radius:7px;border:1px solid transparent;background:transparent;color:var(--muted);cursor:pointer;font-size:15px;transition:all .15s;flex-shrink:0;font-family:'JetBrains Mono',monospace}
+.tbtn2:hover{background:var(--surface2);color:var(--text)}
+.tbtn2.active{background:var(--surface2);border-color:var(--accent);color:var(--accent);box-shadow:0 0 0 1px var(--accent) inset,0 0 12px rgba(124,106,247,.2)}
+.tbtn2 .tlbl{font-size:9px;letter-spacing:.3px;opacity:.8}
+.tsep{width:1px;height:20px;background:var(--border);margin:0 4px;flex-shrink:0}
+.canvas-area{grid-column:1;grid-row:2;position:relative;overflow:hidden;background:#0d0d14;
+background-image:radial-gradient(circle at 20% 50%,rgba(124,106,247,.04) 0%,transparent 50%),radial-gradient(circle at 80% 20%,rgba(247,106,138,.04) 0%,transparent 40%),linear-gradient(rgba(255,255,255,.025) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.025) 1px,transparent 1px);
+background-size:auto,auto,32px 32px,32px 32px}
+.canvas-area canvas{position:absolute;top:0;left:0;width:100%;height:100%}
+#drawCanvas{z-index:1}
+#overlayCanvas{z-index:2;pointer-events:none}
+#cursorCanvas{z-index:3;pointer-events:none}
+.canvas-area.pencil{cursor:crosshair}.canvas-area.brush{cursor:crosshair}.canvas-area.marker{cursor:crosshair}.canvas-area.eraser{cursor:cell}.canvas-area.fill{cursor:copy}.canvas-area.eye{cursor:zoom-in}
+.pip-wrap{position:absolute;z-index:10;border-radius:10px;overflow:hidden;border:1.5px solid rgba(255,255,255,.15);box-shadow:0 4px 24px rgba(0,0,0,.6);cursor:grab;user-select:none;transition:border-color .2s}
+.pip-wrap:hover{border-color:rgba(255,255,255,.35)}
+.pip-wrap video{display:block;width:100%;height:100%;transform:scaleX(-1);object-fit:cover}
+.pip-bar{position:absolute;top:0;left:0;right:0;height:24px;display:flex;align-items:center;justify-content:space-between;padding:0 8px;background:linear-gradient(rgba(0,0,0,.65),transparent);opacity:0;transition:opacity .2s;pointer-events:none}
+.pip-wrap:hover .pip-bar{opacity:1;pointer-events:auto}
+.pip-label{font-size:9px;color:rgba(255,255,255,.7);letter-spacing:.5px}
+.pip-close{font-size:11px;color:rgba(255,255,255,.6);cursor:pointer;background:none;border:none;padding:0;line-height:1}
+.pip-close:hover{color:#fff}
+.pip-resize{position:absolute;bottom:4px;right:4px;width:10px;height:10px;cursor:nwse-resize;opacity:.4}
+.pip-resize:hover{opacity:.9}
+.panel{grid-column:2;grid-row:2/4;border-left:1px solid var(--border);background:var(--surface);overflow-y:auto;display:flex;flex-direction:column}
+.psec{padding:13px 15px;border-bottom:1px solid var(--border)}
+.ptitle{font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);margin-bottom:11px}
+.cgrid{display:grid;grid-template-columns:repeat(8,1fr);gap:3px;margin-bottom:9px}
+.cswatch{width:100%;aspect-ratio:1;border-radius:3px;cursor:pointer;border:2px solid transparent;transition:all .12s}
+.cswatch:hover{transform:scale(1.15)}
+.cswatch.active{border-color:white;box-shadow:0 0 0 1px rgba(255,255,255,.3)}
+.cprow{display:flex;gap:8px;align-items:center;margin-top:7px}
+.cplabel{font-size:10px;color:var(--muted)}
+.cpinput{width:34px;height:26px;border-radius:4px;border:1px solid var(--border);background:transparent;cursor:pointer;padding:2px}
+.ccblock{flex:1;height:26px;border-radius:4px;border:1px solid var(--border);display:flex;align-items:center;justify-content:center}
+.srow{display:flex;align-items:center;gap:10px;margin-bottom:9px}
+.slabel{font-size:10px;color:var(--muted);width:58px;flex-shrink:0}
+.sval{font-size:10px;color:var(--text);width:30px;text-align:right;flex-shrink:0}
+.srange{flex:1;-webkit-appearance:none;appearance:none;height:3px;border-radius:2px;background:var(--surface2);outline:none;cursor:pointer}
+.srange::-webkit-slider-thumb{-webkit-appearance:none;width:13px;height:13px;border-radius:50%;background:var(--accent);cursor:pointer;box-shadow:0 0 5px rgba(124,106,247,.5)}
+.bpreview{width:100%;height:44px;background:var(--surface2);border-radius:6px;border:1px solid var(--border);display:flex;align-items:center;justify-content:center;margin-top:5px}
+/* history strip */
+.hstrip{display:flex;gap:4px;overflow-x:auto;padding:4px 0;scrollbar-width:none;margin-top:4px}
+.hstrip::-webkit-scrollbar{display:none}
+.hthumb{width:38px;height:28px;border-radius:4px;border:1.5px solid var(--border);cursor:pointer;flex-shrink:0;transition:all .12s;overflow:hidden;background:var(--bg)}
+.hthumb:hover{border-color:var(--accent);transform:scale(1.06)}
+.hthumb.cur{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent) inset}
+.hthumb.fut{opacity:.35}
+.hmeta{display:flex;align-items:center;justify-content:space-between;margin-top:6px}
+.hinfo{font-size:9px;color:var(--muted)}
+.hbtns{display:flex;gap:5px}
+.litem{display:flex;align-items:center;gap:7px;padding:6px 7px;border-radius:6px;border:1px solid transparent;cursor:pointer;transition:all .12s;margin-bottom:3px}
+.litem:hover{background:var(--surface2)}
+.litem.active{background:var(--surface2);border-color:var(--accent)}
+.lthumb{width:30px;height:22px;border-radius:3px;background:var(--bg);border:1px solid var(--border);flex-shrink:0}
+.lname{font-size:11px;flex:1}
+.lvis{width:18px;height:18px;display:flex;align-items:center;justify-content:center;opacity:.5;font-size:11px;cursor:pointer;transition:opacity .12s}
+.lvis:hover{opacity:1}
+.ladd{width:100%;padding:6px;border-radius:6px;border:1px dashed var(--border);background:transparent;color:var(--muted);font-size:11px;cursor:pointer;font-family:'JetBrains Mono',monospace;transition:all .12s}
+.ladd:hover{border-color:var(--accent);color:var(--accent);background:rgba(124,106,247,.05)}
+.htabs{display:flex;gap:4px;margin-bottom:4px}
+.htab{flex:1;padding:6px 0;border-radius:7px;border:1px solid var(--border);background:transparent;color:var(--muted);font-family:'JetBrains Mono',monospace;font-size:11px;cursor:pointer;transition:all .15s;text-align:center}
+.htab:hover{background:var(--surface2);color:var(--text)}
+.htab.active{background:var(--surface2);border-color:var(--accent);color:var(--accent)}
+.ctabs{display:flex;gap:3px;margin-bottom:8px}
+.ctab{flex:1;padding:7px 4px;border-radius:7px;border:1px solid var(--border);background:transparent;color:var(--muted);font-family:'JetBrains Mono',monospace;font-size:10px;cursor:pointer;transition:all .15s;text-align:center;line-height:1.4}
+.ctab:hover{background:var(--surface2);color:var(--text)}
+.ctab.active{background:var(--surface2);border-color:var(--accent2);color:var(--accent2)}
+.ctab .ctico{font-size:16px;display:block;margin-bottom:2px}
+.ctab .ctlbl{display:block;font-size:9px;letter-spacing:.3px}
+.mode-hint{font-size:9px;color:var(--muted);line-height:1.8;padding:8px 10px;border-radius:6px;background:var(--surface2);border:1px solid var(--border);margin-bottom:10px}
+.mode-hint span{color:var(--accent2)}
+.trow{display:flex;align-items:center;gap:8px;margin-bottom:9px}
+.ttrack{width:30px;height:17px;border-radius:9px;background:var(--surface2);border:1px solid var(--border);position:relative;cursor:pointer;transition:background .2s;flex-shrink:0}
+.ttrack.on{background:var(--accent);border-color:var(--accent)}
+.tthumb{position:absolute;top:2px;width:11px;height:11px;border-radius:50%;background:white;transition:left .2s;box-shadow:0 1px 3px rgba(0,0,0,.4)}
+.ttrack.on .tthumb{left:15px}
+.ttrack:not(.on) .tthumb{left:2px}
+.tlabel{font-size:11px}
+.gesture-row{display:flex;gap:6px;margin-bottom:10px}
+.gesture-card{flex:1;padding:8px 6px;border-radius:7px;border:1px solid var(--border);background:var(--surface2);text-align:center;transition:all .25s}
+.gesture-card.active-card{border-color:var(--accent2);box-shadow:0 0 10px rgba(247,106,138,.2)}
+.gesture-icon{font-size:18px;margin-bottom:3px}
+.gesture-label{font-size:9px;color:var(--muted);letter-spacing:.5px}
+.gesture-state{font-size:9px;margin-top:2px;font-weight:600}
+.statusbar{grid-column:1;grid-row:3;display:flex;align-items:center;gap:14px;padding:0 14px;border-top:1px solid var(--border);background:var(--surface);font-size:10px;color:var(--muted);letter-spacing:.3px}
+.si{display:flex;align-items:center;gap:4px}
+.sdot{width:4px;height:4px;border-radius:50%}
+.toast{position:fixed;bottom:50px;left:50%;transform:translateX(-50%) translateY(10px);background:var(--surface2);border:1px solid var(--border-hi);border-radius:8px;padding:7px 16px;font-size:11px;color:var(--text);z-index:999;pointer-events:none;opacity:0;transition:all .25s;white-space:nowrap}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { useState, useEffect, useRef, useCallback } = React;
+const defaultHand='Right', defaultMode='single', MAX_HIST=40;
 
-      .canvas-area {
-        grid-column: 1;
-        grid-row: 2;
-        position: relative;
-        overflow: hidden;
-        background: #0d0d14;
-        background-image: radial-gradient(
-            circle at 20% 50%,
-            rgba(124, 106, 247, 0.04) 0%,
-            transparent 50%
-          ),
-          radial-gradient(
-            circle at 80% 20%,
-            rgba(247, 106, 138, 0.04) 0%,
-            transparent 40%
-          ),
-          linear-gradient(rgba(255, 255, 255, 0.025) 1px, transparent 1px),
-          linear-gradient(
-            90deg,
-            rgba(255, 255, 255, 0.025) 1px,
-            transparent 1px
+/* ── Loading ── */
+const STAGES=[
+  {id:'cam', icon:'📷', label:'Starting camera'},
+  {id:'model',icon:'🧠', label:'Loading hand model'},
+  {id:'ready',icon:'✦',  label:'Ready to paint'},
+];
+const TIPS=[
+  'Point index ☝️ up to draw, fist ✊ to pause',
+  'Good lighting helps detection a lot',
+  'Adjust Smooth to reduce jitter',
+  'Try Pinch mode 🤌 for precise control',
+];
+
+const PALETTE=['#ffffff','#c4c4c4','#888888','#444444','#111111','#f87171','#fb923c','#fbbf24','#a3e635','#34d399','#22d3ee','#60a5fa','#818cf8','#c084fc','#f472b6','#7c6af7','#0ea5e9','#10b981','#ef4444','#f97316','#eab308','#84cc16','#06b6d4','#8b5cf6','#ec4899','#fde68a','#bbf7d0','#bae6fd','#e9d5ff','#fecdd3','#78350f','#14532d','#1e3a5f','#3b0764','#500724','#0f172a','#1e293b','#334155','#64748b','#94a3b8'];
+const TOOLS=[{id:'pencil',icon:'✏️',label:'Pencil',key:'P'},{id:'brush',icon:'🖌️',label:'Brush',key:'B'},{id:'marker',icon:'🖊️',label:'Marker',key:'M'},{id:'eraser',icon:'🧹',label:'Eraser',key:'E'},{id:'fill',icon:'🪣',label:'Fill',key:'F'},{id:'eye',icon:'💉',label:'Dropper',key:'I'}];
+const CTRL_MODES=[
+  {id:'pinch',icon:'🤌',label:'Pinch',hint:['Control hand','Pinch 🤌 → draw','Release → pause']},
+  {id:'open',icon:'🖐️',label:'Open',hint:['Control hand','Open 🖐️ → draw','Fist ✊ → pause']},
+  {id:'single',icon:'☝️',label:'1 Hand',hint:['Drawing hand','Index up ☝️ → draw','Fist ✊ → pause']},
+];
+const HAND_CONNECTIONS=[[0,1],[1,2],[2,3],[3,4],[0,5],[5,6],[6,7],[7,8],[5,9],[9,10],[10,11],[11,12],[9,13],[13,14],[14,15],[15,16],[13,17],[0,17],[17,18],[18,19],[19,20]];
+
+function hexToRgb(hex){const v=hex.replace('#','');return[parseInt(v.slice(0,2),16),parseInt(v.slice(2,4),16),parseInt(v.slice(4,6),16)]}
+function floodFill(ctx,sx,sy,fc){const{width:w,height:h}=ctx.canvas;const img=ctx.getImageData(0,0,w,h);const d=img.data;const px=(Math.round(sx)+Math.round(sy)*w)*4;const[tr,tg,tb]=[d[px],d[px+1],d[px+2]];const[fr,fg,fb]=hexToRgb(fc);if(tr===fr&&tg===fg&&tb===fb)return;const stack=[[Math.round(sx),Math.round(sy)]];const vis=new Uint8Array(w*h);while(stack.length){const[cx,cy]=stack.pop();if(cx<0||cx>=w||cy<0||cy>=h||vis[cx+cy*w])continue;const i=(cx+cy*w)*4;if(d[i]!==tr||d[i+1]!==tg||d[i+2]!==tb)continue;vis[cx+cy*w]=1;d[i]=fr;d[i+1]=fg;d[i+2]=fb;d[i+3]=255;stack.push([cx+1,cy],[cx-1,cy],[cx,cy+1],[cx,cy-1])}ctx.putImageData(img,0,0)}
+function pinchDistance3D(lm){const t=lm[4],i=lm[8];return Math.hypot(i.x-t.x,i.y-t.y,(i.z||0)-(t.z||0))}
+function isHandOpen(lm){let o=0;[[8,6],[12,10],[16,14],[20,18],[4,2]].forEach(([t,p])=>{if(lm[t].y<lm[p].y)o++});return o>=3}
+function isIndexOnly(lm){return lm[8].y<lm[6].y&&lm[12].y>lm[10].y&&lm[16].y>lm[14].y&&lm[20].y>lm[18].y}
+function drawSkeletonFn(ctx,hand,w,h,theme,showSkel){
+  if(!showSkel||!hand)return;
+  const{joint,tip,glow}=theme;ctx.strokeStyle=joint;ctx.lineWidth=2;
+  for(const[a,b]of HAND_CONNECTIONS){const pa=hand[a],pb=hand[b];ctx.beginPath();ctx.moveTo((1-pa.x)*w,pa.y*h);ctx.lineTo((1-pb.x)*w,pb.y*h);ctx.stroke()}
+  for(let i=0;i<hand.length;i++){const p=hand[i],x=(1-p.x)*w,y=p.y*h,isTip=[4,8,12,16,20].includes(i);ctx.beginPath();ctx.arc(x,y,isTip?5:3,0,Math.PI*2);ctx.fillStyle=isTip?tip:joint;ctx.fill()}
+  const t=hand[8];ctx.beginPath();ctx.arc((1-t.x)*w,t.y*h,11,0,Math.PI*2);ctx.strokeStyle=glow;ctx.lineWidth=1.5;ctx.stroke();
+}
+function drawCtrlIndicatorFn(ctx,hand,w,h,active,mode){
+  const wx=(1-hand[0].x)*w,wy=hand[0].y*h;
+  ctx.beginPath();ctx.arc(wx,wy,14,0,Math.PI*2);ctx.strokeStyle=active?'rgba(247,106,138,.9)':'rgba(247,106,138,.25)';ctx.lineWidth=active?2.5:1;ctx.stroke();
+  if(mode==='pinch'){const t4x=(1-hand[4].x)*w,t4y=hand[4].y*h,t8x=(1-hand[8].x)*w,t8y=hand[8].y*h;ctx.beginPath();ctx.moveTo(t4x,t4y);ctx.lineTo(t8x,t8y);ctx.strokeStyle=active?'rgba(247,106,138,.9)':'rgba(247,106,138,.3)';ctx.lineWidth=active?2:1;ctx.setLineDash([3,3]);ctx.stroke();ctx.setLineDash([]);const mx=(t4x+t8x)/2,my=(t4y+t8y)/2;ctx.beginPath();ctx.arc(mx,my,active?4:2,0,Math.PI*2);ctx.fillStyle=active?'#f76a8a':'rgba(247,106,138,.4)';ctx.fill()}
+  const lbl={pinch:active?'PINCH':'OPEN',open:active?'DRAW':'FIST',single:active?'DRAW':'FIST'};
+  ctx.font='10px monospace';ctx.fillStyle=active?'#f76a8a':'rgba(247,106,138,.4)';ctx.textAlign='center';ctx.fillText(lbl[mode]||'',wx,wy+26);ctx.textAlign='left';
+}
+
+let layerCount=1;
+const mkLayer=(n)=>({id:crypto.randomUUID(),name:n||`Layer ${++layerCount}`,visible:true});
+
+/* ── History — ImageBitmap (GPU-resident, no getImageData stalls) ── */
+class HistMgr{
+  constructor(){this.stack=[];this.cur=-1}
+  async snap(offscreens,layers,activeId){
+    const e={bitmaps:{},order:layers.map(l=>({id:l.id,name:l.name,visible:l.visible})),activeId};
+    await Promise.all(layers.map(async l=>{const oc=offscreens[l.id];if(oc)e.bitmaps[l.id]=await createImageBitmap(oc)}));
+    if(this.cur<this.stack.length-1){
+      this.stack.slice(this.cur+1).forEach(old=>Object.values(old.bitmaps).forEach(b=>b.close?.()));
+      this.stack=this.stack.slice(0,this.cur+1);
+    }
+    this.stack.push(e);
+    if(this.stack.length>MAX_HIST){const ev=this.stack.shift();Object.values(ev.bitmaps).forEach(b=>b.close?.())}
+    else this.cur++;
+  }
+  restore(entry,offscreens,w,h){
+    if(!entry)return;
+    for(const m of entry.order){
+      if(!offscreens[m.id]){const oc=document.createElement('canvas');oc.width=w;oc.height=h;offscreens[m.id]=oc}
+      const oc=offscreens[m.id];
+      if(oc.width!==w||oc.height!==h){oc.width=w;oc.height=h}
+      const ctx=oc.getContext('2d');ctx.clearRect(0,0,w,h);
+      const bm=entry.bitmaps[m.id];if(bm)ctx.drawImage(bm,0,0);
+    }
+  }
+  canUndo(){return this.cur>0}canRedo(){return this.cur<this.stack.length-1}
+  undo(){if(this.canUndo())this.cur--;return this.stack[this.cur]}
+  redo(){if(this.canRedo())this.cur++;return this.stack[this.cur]}
+  get(){return this.stack}getCur(){return this.cur}
+}
+
+/* ── Loading overlay component ── */
+function LoadingOverlay({stage,tipIdx}){
+  const si=STAGES.findIndex(s=>s.id===stage);
+  const pct=si<0?100:Math.round(si/(STAGES.length-1)*100);
+  return(
+    <div className={`lo ${stage==='done'?'gone':''}`}>
+      <div className="lo-logo">✦ FINGER PAINT STUDIO</div>
+      <div className="lo-stages">
+        {STAGES.map((s,i)=>{
+          const isA=s.id===stage,isD=i<si||(stage==='done');
+          return(
+            <div key={s.id} className={`lo-stage ${isA?'sa':''} ${isD?'sd':''}`}>
+              <span className="lo-icon">{s.icon}</span>
+              <span className="lo-lbl">{s.label}</span>
+              {isA?<div className="lo-spin"/>:isD?<div className="lo-check">✓</div>:<div className="lo-dot"/>}
+              <span className="lo-badge">{isA?'Loading…':isD?'Done':'Waiting'}</span>
+            </div>
           );
-        background-size: auto, auto, 32px 32px, 32px 32px;
-      }
-      .canvas-area canvas {
-        position: absolute;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-      }
-      #drawCanvas {
-        z-index: 1;
-      }
-      #liveCanvas {
-        z-index: 2;
-        pointer-events: none;
-      }
-      #overlayCanvas {
-        z-index: 3;
-        pointer-events: none;
-      }
-      #cursorCanvas {
-        z-index: 4;
-        pointer-events: none;
-      }
-      .canvas-area.pencil {
-        cursor: crosshair;
-      }
-      .canvas-area.brush {
-        cursor: crosshair;
-      }
-      .canvas-area.marker {
-        cursor: crosshair;
-      }
-      .canvas-area.eraser {
-        cursor: cell;
-      }
-      .canvas-area.fill {
-        cursor: copy;
-      }
-      .canvas-area.eye {
-        cursor: zoom-in;
-      }
-      .pip-wrap {
-        position: absolute;
-        z-index: 10;
-        border-radius: 10px;
-        overflow: hidden;
-        border: 1.5px solid rgba(255, 255, 255, 0.15);
-        box-shadow: 0 4px 24px rgba(0, 0, 0, 0.6);
-        cursor: grab;
-        user-select: none;
-        transition: border-color 0.2s;
-      }
-      .pip-wrap:hover {
-        border-color: rgba(255, 255, 255, 0.35);
-      }
-      .pip-wrap.dragging {
-        cursor: grabbing;
-        border-color: var(--accent);
-      }
-      .pip-wrap video {
-        display: block;
-        width: 100%;
-        height: 100%;
-        transform: scaleX(-1);
-        object-fit: cover;
-      }
-      .pip-bar {
-        position: absolute;
-        top: 0;
-        left: 0;
-        right: 0;
-        height: 24px;
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        padding: 0 8px;
-        background: linear-gradient(rgba(0, 0, 0, 0.65), transparent);
-        opacity: 0;
-        transition: opacity 0.2s;
-        pointer-events: none;
-      }
-      .pip-wrap:hover .pip-bar {
-        opacity: 1;
-        pointer-events: auto;
-      }
-      .pip-label {
-        font-size: 9px;
-        color: rgba(255, 255, 255, 0.7);
-        letter-spacing: 0.5px;
-      }
-      .pip-close {
-        font-size: 11px;
-        color: rgba(255, 255, 255, 0.6);
-        cursor: pointer;
-        background: none;
-        border: none;
-        padding: 0;
-        line-height: 1;
-      }
-      .pip-close:hover {
-        color: #fff;
-      }
-      .pip-resize {
-        position: absolute;
-        bottom: 4px;
-        right: 4px;
-        width: 10px;
-        height: 10px;
-        cursor: nwse-resize;
-        opacity: 0.4;
-      }
-      .pip-resize:hover {
-        opacity: 0.9;
-      }
+        })}
+      </div>
+      <div className="lo-bar-wrap"><div className="lo-bar" style={{width:`${pct}%`}}/></div>
+      <div className="lo-tip">💡 {TIPS[tipIdx%TIPS.length]}</div>
+    </div>
+  );
+}
 
-      .panel {
-        grid-column: 2;
-        grid-row: 2/4;
-        border-left: 1px solid var(--border);
-        background: var(--surface);
-        overflow-y: auto;
-        display: flex;
-        flex-direction: column;
-      }
-      .psec {
-        padding: 13px 15px;
-        border-bottom: 1px solid var(--border);
-      }
-      .ptitle {
-        font-size: 9px;
-        letter-spacing: 1.5px;
-        text-transform: uppercase;
-        color: var(--muted);
-        margin-bottom: 11px;
-      }
+/* ── History thumbnail ── */
+function HThumb({entry}){
+  const ref=useRef(null);
+  useEffect(()=>{
+    const c=ref.current;if(!c||!entry?.order)return;
+    const ctx=c.getContext('2d');ctx.clearRect(0,0,c.width,c.height);
+    for(const m of entry.order){if(!m.visible)continue;const bm=entry.bitmaps?.[m.id];if(bm)ctx.drawImage(bm,0,0,c.width,c.height)}
+  },[entry]);
+  return <canvas ref={ref} width={36} height={26} style={{width:'100%',height:'100%',borderRadius:3}}/>;
+}
 
-      .cgrid {
-        display: grid;
-        grid-template-columns: repeat(8, 1fr);
-        gap: 3px;
-        margin-bottom: 9px;
-      }
-      .cswatch {
-        width: 100%;
-        aspect-ratio: 1;
-        border-radius: 3px;
-        cursor: pointer;
-        border: 2px solid transparent;
-        transition: all 0.12s;
-      }
-      .cswatch:hover {
-        transform: scale(1.15);
-      }
-      .cswatch.active {
-        border-color: white;
-        box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.3);
-      }
-      .cprow {
-        display: flex;
-        gap: 8px;
-        align-items: center;
-        margin-top: 7px;
-      }
-      .cplabel {
-        font-size: 10px;
-        color: var(--muted);
-      }
-      .cpinput {
-        width: 34px;
-        height: 26px;
-        border-radius: 4px;
-        border: 1px solid var(--border);
-        background: transparent;
-        cursor: pointer;
-        padding: 2px;
-      }
-      .ccblock {
-        flex: 1;
-        height: 26px;
-        border-radius: 4px;
-        border: 1px solid var(--border);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-      }
+/* ── APP ── */
+function App(){
+  const [tool,setTool]=useState('pencil');
+  const [color,setColor]=useState('#7c6af7');
+  const [size,setSize]=useState(8);
+  const [opacity,setOp]=useState(100);
+  const [layers,setLayers]=useState([{id:'l1',name:'Layer 1',visible:true}]);
+  const [activeId,setActiveId]=useState('l1');
+  const [showSkel,setShowSkel]=useState(true);
+  const [showCam,setShowCam]=useState(true);
+  const [drawHand,setDrawHand]=useState(defaultHand);
+  const [ctrlMode,setCtrlMode]=useState(defaultMode);
+  const [handStatus,setHandStatus]=useState({drawDetected:false,ctrlDetected:false,drawing:false});
+  const [pipPos,setPipPos]=useState({x:20,y:20});
+  const [pipSize,setPipSize]=useState({w:220,h:165});
+  const [smoothStrength,setSmoothStrength]=useState(25);
+  const [coords,setCoords]=useState({x:0,y:0});
+  const [histCur,setHistCur]=useState(0);
+  const [histLen,setHistLen]=useState(1);
+  const [toast,setToast]=useState({msg:'',show:false});
 
-      .srow {
-        display: flex;
-        align-items: center;
-        gap: 10px;
-        margin-bottom: 9px;
-      }
-      .slabel {
-        font-size: 10px;
-        color: var(--muted);
-        width: 58px;
-        flex-shrink: 0;
-      }
-      .sval {
-        font-size: 10px;
-        color: var(--text);
-        width: 30px;
-        text-align: right;
-        flex-shrink: 0;
-      }
-      .srange {
-        flex: 1;
-        -webkit-appearance: none;
-        appearance: none;
-        height: 3px;
-        border-radius: 2px;
-        background: var(--surface2);
-        outline: none;
-        cursor: pointer;
-      }
-      .srange::-webkit-slider-thumb {
-        -webkit-appearance: none;
-        width: 13px;
-        height: 13px;
-        border-radius: 50%;
-        background: var(--accent);
-        cursor: pointer;
-        box-shadow: 0 0 5px rgba(124, 106, 247, 0.5);
-      }
-      .bpreview {
-        width: 100%;
-        height: 44px;
-        background: var(--surface2);
-        border-radius: 6px;
-        border: 1px solid var(--border);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        margin-top: 5px;
-      }
+  /* loading */
+  const [loadStage,setLoadStage]=useState('cam');
+  const loadStageRef=useRef('cam');
+  const setStage=(s)=>{loadStageRef.current=s;setLoadStage(s)};
+  const [modelReady,setModelReady]=useState(false);
+  const [tipIdx,setTipIdx]=useState(0);
+  useEffect(()=>{if(modelReady)return;const id=setInterval(()=>setTipIdx(i=>i+1),3000);return()=>clearInterval(id)},[modelReady]);
 
-      /* ── History panel ── */
-      .history-strip {
-        display: flex;
-        gap: 4px;
-        overflow-x: auto;
-        padding: 4px 0;
-        scrollbar-width: none;
-        margin-top: 4px;
-      }
-      .history-strip::-webkit-scrollbar {
-        display: none;
-      }
-      .hist-thumb {
-        width: 38px;
-        height: 28px;
-        border-radius: 4px;
-        border: 1.5px solid var(--border);
-        cursor: pointer;
-        flex-shrink: 0;
-        transition: all 0.12s;
-        position: relative;
-        overflow: hidden;
-        background: var(--bg);
-      }
-      .hist-thumb:hover {
-        border-color: var(--accent);
-        transform: scale(1.06);
-      }
-      .hist-thumb.current {
-        border-color: var(--accent);
-        box-shadow: 0 0 0 1px var(--accent) inset;
-      }
-      .hist-thumb.future {
-        opacity: 0.35;
-      }
-      .hist-meta {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        margin-top: 6px;
-      }
-      .hist-info {
-        font-size: 9px;
-        color: var(--muted);
-      }
-      .hist-btns {
-        display: flex;
-        gap: 5px;
-      }
+  const drawRef=useRef(null),overlayRef=useRef(null),skelBufRef=useRef(null),cursorRef=useRef(null),containerRef=useRef(null),videoRef=useRef(null);
+  const offscreens=useRef({});
+  const isDrawingRef=useRef(false),prevPt=useRef(null),wasActive=useRef(false);
+  const hm=useRef(new HistMgr());
+  const pendingSnap=useRef(false);
 
-      /* ── Layers with drag ── */
-      .litem {
-        display: flex;
-        align-items: center;
-        gap: 7px;
-        padding: 6px 7px;
-        border-radius: 6px;
-        border: 1px solid transparent;
-        cursor: pointer;
-        transition: all 0.12s;
-        margin-bottom: 3px;
-        position: relative;
-        user-select: none;
-      }
-      .litem:hover {
-        background: var(--surface2);
-      }
-      .litem.active {
-        background: var(--surface2);
-        border-color: var(--accent);
-      }
-      .litem.drag-over {
-        border-color: var(--accent2);
-        background: rgba(247, 106, 138, 0.08);
-      }
-      .litem.dragging-self {
-        opacity: 0.4;
-        border-style: dashed;
-      }
-      .ldrag-handle {
-        font-size: 10px;
-        color: var(--muted);
-        cursor: grab;
-        padding: 0 2px;
-        flex-shrink: 0;
-        touch-action: none;
-      }
-      .ldrag-handle:hover {
-        color: var(--text);
-      }
-      .ldrag-handle:active {
-        cursor: grabbing;
-      }
-      .lthumb {
-        width: 30px;
-        height: 22px;
-        border-radius: 3px;
-        background: var(--bg);
-        border: 1px solid var(--border);
-        flex-shrink: 0;
-        overflow: hidden;
-      }
-      .lthumb canvas {
-        width: 100%;
-        height: 100%;
-      }
-      .lname {
-        font-size: 11px;
-        flex: 1;
-      }
-      .lvis {
-        width: 18px;
-        height: 18px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        opacity: 0.5;
-        font-size: 11px;
-        cursor: pointer;
-        transition: opacity 0.12s;
-      }
-      .lvis:hover {
-        opacity: 1;
-      }
-      .ladd {
-        width: 100%;
-        padding: 6px;
-        border-radius: 6px;
-        border: 1px dashed var(--border);
-        background: transparent;
-        color: var(--muted);
-        font-size: 11px;
-        cursor: pointer;
-        font-family: 'JetBrains Mono', monospace;
-        transition: all 0.12s;
-      }
-      .ladd:hover {
-        border-color: var(--accent);
-        color: var(--accent);
-        background: rgba(124, 106, 247, 0.05);
-      }
-      .drop-line {
-        height: 2px;
-        border-radius: 2px;
-        background: var(--accent2);
-        margin-bottom: 3px;
-        opacity: 0;
-        transition: opacity 0.1s;
-      }
-      .drop-line.show {
-        opacity: 1;
-      }
+  const toolRef=useRef(tool);     toolRef.current=tool;
+  const colorRef=useRef(color);   colorRef.current=color;
+  const sizeRef=useRef(size);     sizeRef.current=size;
+  const opRef=useRef(opacity);    opRef.current=opacity;
+  const activeRef=useRef(activeId);activeRef.current=activeId;
+  const layersRef=useRef(layers); layersRef.current=layers;
+  const showSkelRef=useRef(showSkel);showSkelRef.current=showSkel;
+  const drawHandRef=useRef(drawHand);drawHandRef.current=drawHand;
+  const ctrlModeRef=useRef(ctrlMode);ctrlModeRef.current=ctrlMode;
+  const smoothRef=useRef(smoothStrength);smoothRef.current=smoothStrength;
 
-      .htabs {
-        display: flex;
-        gap: 4px;
-        margin-bottom: 4px;
-      }
-      .htab {
-        flex: 1;
-        padding: 6px 0;
-        border-radius: 7px;
-        border: 1px solid var(--border);
-        background: transparent;
-        color: var(--muted);
-        font-family: 'JetBrains Mono', monospace;
-        font-size: 11px;
-        cursor: pointer;
-        transition: all 0.15s;
-        text-align: center;
-      }
-      .htab:hover {
-        background: var(--surface2);
-        color: var(--text);
-      }
-      .htab.active {
-        background: var(--surface2);
-        border-color: var(--accent);
-        color: var(--accent);
-      }
+  const showToast=useCallback((msg)=>{setToast({msg,show:true});setTimeout(()=>setToast(t=>({...t,show:false})),1400)},[]);
 
-      .ctabs {
-        display: flex;
-        gap: 3px;
-        margin-bottom: 8px;
-      }
-      .ctab {
-        flex: 1;
-        padding: 7px 4px;
-        border-radius: 7px;
-        border: 1px solid var(--border);
-        background: transparent;
-        color: var(--muted);
-        font-family: 'JetBrains Mono', monospace;
-        font-size: 10px;
-        cursor: pointer;
-        transition: all 0.15s;
-        text-align: center;
-        line-height: 1.4;
-      }
-      .ctab:hover {
-        background: var(--surface2);
-        color: var(--text);
-      }
-      .ctab.active {
-        background: var(--surface2);
-        border-color: var(--accent2);
-        color: var(--accent2);
-      }
-      .ctab .ctico {
-        font-size: 16px;
-        display: block;
-        margin-bottom: 2px;
-      }
-      .ctab .ctlbl {
-        display: block;
-        font-size: 9px;
-        letter-spacing: 0.3px;
-      }
+  /* snapshot — fire and forget, non-blocking */
+  const commitSnap=useCallback(()=>{
+    hm.current.snap(offscreens.current,layersRef.current,activeRef.current)
+      .then(()=>{setHistCur(hm.current.getCur());setHistLen(hm.current.get().length)});
+  },[]);
 
-      .mode-hint {
-        font-size: 9px;
-        color: var(--muted);
-        line-height: 1.8;
-        padding: 8px 10px;
-        border-radius: 6px;
-        background: var(--surface2);
-        border: 1px solid var(--border);
-        margin-bottom: 10px;
-      }
-      .mode-hint span {
-        color: var(--accent2);
-      }
+  const restoreEntry=useCallback((entry)=>{
+    if(!entry)return;
+    const el=containerRef.current;if(!el)return;
+    hm.current.restore(entry,offscreens.current,el.clientWidth,el.clientHeight);
+    setLayers(entry.order.map(m=>({...m})));
+    setActiveId(entry.activeId);
+  },[]);
 
-      .trow {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        margin-bottom: 9px;
-      }
-      .ttrack {
-        width: 30px;
-        height: 17px;
-        border-radius: 9px;
-        background: var(--surface2);
-        border: 1px solid var(--border);
-        position: relative;
-        cursor: pointer;
-        transition: background 0.2s;
-        flex-shrink: 0;
-      }
-      .ttrack.on {
-        background: var(--accent);
-        border-color: var(--accent);
-      }
-      .tthumb {
-        position: absolute;
-        top: 2px;
-        width: 11px;
-        height: 11px;
-        border-radius: 50%;
-        background: white;
-        transition: left 0.2s;
-        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
-      }
-      .ttrack.on .tthumb {
-        left: 15px;
-      }
-      .ttrack:not(.on) .tthumb {
-        left: 2px;
-      }
-      .tlabel {
-        font-size: 11px;
-      }
+  const getOC=(id)=>{
+    if(!offscreens.current[id]){const el=containerRef.current;const w=el?.clientWidth||800,h=el?.clientHeight||600;const oc=document.createElement('canvas');oc.width=w;oc.height=h;offscreens.current[id]=oc}
+    return offscreens.current[id];
+  };
+  const composite=useCallback(()=>{
+    const c=drawRef.current;if(!c)return;const ctx=c.getContext('2d');ctx.clearRect(0,0,c.width,c.height);
+    for(const l of layersRef.current){if(!l.visible)continue;const oc=offscreens.current[l.id];if(oc)ctx.drawImage(oc,0,0)}
+  },[]);
+  const getCtx=useCallback(()=>{const oc=getOC(activeRef.current);return oc?oc.getContext('2d'):null},[]);
 
-      .gesture-row {
-        display: flex;
-        gap: 6px;
-        margin-bottom: 10px;
-      }
-      .gesture-card {
-        flex: 1;
-        padding: 8px 6px;
-        border-radius: 7px;
-        border: 1px solid var(--border);
-        background: var(--surface2);
-        text-align: center;
-        transition: all 0.25s;
-      }
-      .gesture-card.active-card {
-        border-color: var(--accent2);
-        box-shadow: 0 0 10px rgba(247, 106, 138, 0.2);
-      }
-      .gesture-icon {
-        font-size: 18px;
-        margin-bottom: 3px;
-      }
-      .gesture-label {
-        font-size: 9px;
-        color: var(--muted);
-        letter-spacing: 0.5px;
-      }
-      .gesture-state {
-        font-size: 9px;
-        margin-top: 2px;
-        font-weight: 600;
-      }
+  useEffect(()=>{
+    const resize=()=>{
+      const el=containerRef.current;if(!el)return;const w=el.clientWidth,h=el.clientHeight;
+      [drawRef,overlayRef,cursorRef].forEach(r=>{if(r.current){r.current.width=w;r.current.height=h}});
+      if(!skelBufRef.current)skelBufRef.current=document.createElement('canvas');
+      skelBufRef.current.width=w;skelBufRef.current.height=h;
+      layersRef.current.forEach(l=>{if(!offscreens.current[l.id]){const oc=document.createElement('canvas');oc.width=w;oc.height=h;offscreens.current[l.id]=oc}});
+      composite();
+    };
+    resize();window.addEventListener('resize',resize);return()=>window.removeEventListener('resize',resize);
+  },[composite]);
+  useEffect(()=>{
+    const el=containerRef.current;const w=el?.clientWidth||800,h=el?.clientHeight||600;
+    layers.forEach(l=>{if(!offscreens.current[l.id]){const oc=document.createElement('canvas');oc.width=w;oc.height=h;offscreens.current[l.id]=oc}});
+  },[layers]);
+  useEffect(()=>{setTimeout(()=>commitSnap(),200)},[]);
 
-      .statusbar {
-        grid-column: 1;
-        grid-row: 3;
-        display: flex;
-        align-items: center;
-        gap: 14px;
-        padding: 0 14px;
-        border-top: 1px solid var(--border);
-        background: var(--surface);
-        font-size: 10px;
-        color: var(--muted);
-        letter-spacing: 0.3px;
-      }
-      .si {
-        display: flex;
-        align-items: center;
-        gap: 4px;
-      }
-      .sdot {
-        width: 4px;
-        height: 4px;
-        border-radius: 50%;
-      }
+  const applyBrush=(ctx)=>{const t=toolRef.current,s=sizeRef.current,op=opRef.current/100;ctx.globalAlpha=op;ctx.lineCap='round';ctx.lineJoin='round';ctx.shadowBlur=0;if(t==='eraser'){ctx.globalCompositeOperation='destination-out';ctx.strokeStyle='rgba(0,0,0,1)';ctx.lineWidth=s;return}ctx.globalCompositeOperation='source-over';ctx.strokeStyle=colorRef.current;if(t==='brush'){ctx.globalAlpha=op*.65;ctx.lineWidth=s*2.5;ctx.shadowBlur=s;ctx.shadowColor=colorRef.current}else if(t==='marker'){ctx.globalAlpha=op*.85;ctx.lineWidth=s*1.8}else{ctx.lineWidth=s}};
+  const resetCtx=(ctx)=>{ctx.globalCompositeOperation='source-over';ctx.globalAlpha=1;ctx.shadowBlur=0};
+  const beginStroke=(x,y)=>{const ctx=getCtx();if(!ctx)return;applyBrush(ctx);ctx.beginPath();ctx.moveTo(x,y);prevPt.current={x,y};isDrawingRef.current=true;pendingSnap.current=true};
+  const continueStroke=(x,y)=>{const ctx=getCtx();if(!ctx||!prevPt.current)return;ctx.lineTo(x,y);ctx.stroke();prevPt.current={x,y};composite()};
+  const endStroke=()=>{const ctx=getCtx();if(ctx)resetCtx(ctx);prevPt.current=null;isDrawingRef.current=false;if(pendingSnap.current){pendingSnap.current=false;commitSnap()}};
 
-      /* Toast notification */
-      .toast {
-        position: fixed;
-        bottom: 50px;
-        left: 50%;
-        transform: translateX(-50%) translateY(10px);
-        background: var(--surface2);
-        border: 1px solid var(--border-hi);
-        border-radius: 8px;
-        padding: 7px 16px;
-        font-size: 11px;
-        color: var(--text);
-        z-index: 999;
-        pointer-events: none;
-        opacity: 0;
-        transition: all 0.25s;
-        white-space: nowrap;
-      }
-      .toast.show {
-        opacity: 1;
-        transform: translateX(-50%) translateY(0);
-      }
-    </style>
-  </head>
-  <body>
-    <div id="root"></div>
-    <script type="text/babel">
-      const { useState, useEffect, useRef, useCallback } = React;
+  const drawCursor=useCallback((x,y)=>{
+    const c=cursorRef.current;if(!c)return;const ctx=c.getContext('2d');ctx.clearRect(0,0,c.width,c.height);
+    ctx.beginPath();ctx.arc(x,y,Math.max(sizeRef.current/2,4),0,Math.PI*2);ctx.strokeStyle='rgba(255,255,255,.6)';ctx.lineWidth=1;ctx.stroke();
+    ctx.beginPath();ctx.arc(x,y,2,0,Math.PI*2);ctx.fillStyle=toolRef.current==='eraser'?'#f87171':colorRef.current;ctx.fill();
+  },[]);
 
-      const defaultHand = 'Right';
-      const defaultMode = 'single';
-      const MAX_HISTORY = 40;
+  const toXY=(e)=>{const c=drawRef.current;if(!c)return{x:0,y:0};const r=c.getBoundingClientRect();const cx='touches'in e?e.touches[0].clientX:e.clientX;const cy='touches'in e?e.touches[0].clientY:e.clientY;return{x:(cx-r.left)*(c.width/r.width),y:(cy-r.top)*(c.height/r.height)}};
+  const onDown=(e)=>{const{x,y}=toXY(e);if(toolRef.current==='fill'){const ctx=getCtx();if(ctx){floodFill(ctx,x,y,colorRef.current);composite();commitSnap()}return}if(toolRef.current==='eye'){const c=drawRef.current;if(!c)return;const d=c.getContext('2d').getImageData(Math.round(x),Math.round(y),1,1).data;if(d[3]>0)setColor('#'+[d[0],d[1],d[2]].map(v=>v.toString(16).padStart(2,'0')).join(''));setTool('pencil');return}beginStroke(x,y)};
+  const onMove=(e)=>{const{x,y}=toXY(e);setCoords({x:Math.round(x),y:Math.round(y)});drawCursor(x,y);if(isDrawingRef.current)continueStroke(x,y)};
+  const onUp=()=>endStroke();
 
-      const PALETTE = [
-        '#ffffff',
-        '#c4c4c4',
-        '#888888',
-        '#444444',
-        '#111111',
-        '#f87171',
-        '#fb923c',
-        '#fbbf24',
-        '#a3e635',
-        '#34d399',
-        '#22d3ee',
-        '#60a5fa',
-        '#818cf8',
-        '#c084fc',
-        '#f472b6',
-        '#7c6af7',
-        '#0ea5e9',
-        '#10b981',
-        '#ef4444',
-        '#f97316',
-        '#eab308',
-        '#84cc16',
-        '#06b6d4',
-        '#8b5cf6',
-        '#ec4899',
-        '#fde68a',
-        '#bbf7d0',
-        '#bae6fd',
-        '#e9d5ff',
-        '#fecdd3',
-        '#78350f',
-        '#14532d',
-        '#1e3a5f',
-        '#3b0764',
-        '#500724',
-        '#0f172a',
-        '#1e293b',
-        '#334155',
-        '#64748b',
-        '#94a3b8',
-      ];
+  const undo=useCallback(()=>{if(!hm.current.canUndo()){showToast('Nothing to undo');return}const e=hm.current.undo();restoreEntry(e);setHistCur(hm.current.getCur());composite();showToast('⌫ Undo')},[restoreEntry,showToast]);
+  const redo=useCallback(()=>{if(!hm.current.canRedo()){showToast('Nothing to redo');return}const e=hm.current.redo();restoreEntry(e);setHistCur(hm.current.getCur());composite();showToast('↷ Redo')},[restoreEntry,showToast]);
 
-      const TOOLS = [
-        { id: 'pencil', icon: '✏️', label: 'Pencil', key: 'P' },
-        { id: 'brush', icon: '🖌️', label: 'Brush', key: 'B' },
-        { id: 'marker', icon: '🖊️', label: 'Marker', key: 'M' },
-        { id: 'eraser', icon: '🧹', label: 'Eraser', key: 'E' },
-        { id: 'fill', icon: '🪣', label: 'Fill', key: 'F' },
-        { id: 'eye', icon: '💉', label: 'Dropper', key: 'I' },
-      ];
+  useEffect(()=>{
+    const h=(e)=>{
+      if(e.target.tagName==='INPUT')return;
+      if((e.ctrlKey||e.metaKey)&&e.key==='z'){e.preventDefault();if(e.shiftKey)redo();else undo();return}
+      if((e.ctrlKey||e.metaKey)&&e.key==='y'){e.preventDefault();redo();return}
+      TOOLS.forEach(t=>{if(e.key.toUpperCase()===t.key)setTool(t.id)});
+    };
+    window.addEventListener('keydown',h);return()=>window.removeEventListener('keydown',h);
+  },[undo,redo]);
 
-      const CTRL_MODES = [
-        {
-          id: 'pinch',
-          icon: '🤌',
-          label: 'Pinch',
-          hint: ['Control hand', 'Pinch 🤌 → draw', 'Release → pause'],
-        },
-        {
-          id: 'open',
-          icon: '🖐️',
-          label: 'Open',
-          hint: ['Control hand', 'Open 🖐️ → draw', 'Fist ✊ → pause'],
-        },
-        {
-          id: 'single',
-          icon: '☝️',
-          label: '1 Hand',
-          hint: ['Drawing hand', 'Index up ☝️ → draw', 'Fist ✊ → pause'],
-        },
-      ];
+  /* ── MediaPipe — UNCHANGED from v2.0 that worked ── */
+  useEffect(()=>{
+    const video=videoRef.current;if(!video)return;
+    let cam;
+    const smoothed={};
+    let frameCount=0;
+    const firstRef={done:false};
 
-      const HAND_CONNECTIONS = [
-        [0, 1],
-        [1, 2],
-        [2, 3],
-        [3, 4],
-        [0, 5],
-        [5, 6],
-        [6, 7],
-        [7, 8],
-        [5, 9],
-        [9, 10],
-        [10, 11],
-        [11, 12],
-        [9, 13],
-        [13, 14],
-        [14, 15],
-        [15, 16],
-        [13, 17],
-        [0, 17],
-        [17, 18],
-        [18, 19],
-        [19, 20],
-      ];
+    function smoothLandmarks(label,raw){
+      if(!raw||raw.length<21)return null;
+      const SMOOTH=smoothRef.current/100,prev=smoothed[label];
+      if(!prev||prev.length<21){smoothed[label]=raw.map(p=>({x:p.x,y:p.y,z:p.z||0}));return smoothed[label]}
+      smoothed[label]=raw.map((p,i)=>({x:SMOOTH*p.x+(1-SMOOTH)*prev[i].x,y:SMOOTH*p.y+(1-SMOOTH)*prev[i].y,z:SMOOTH*(p.z||0)+(1-SMOOTH)*prev[i].z}));
+      return smoothed[label];
+    }
+    function validLM(lm){return lm&&lm.length===21&&lm.every(p=>p&&typeof p.x==='number')}
 
-      function hexToRgb(hex) {
-        const v = hex.replace('#', '');
-        return [
-          parseInt(v.slice(0, 2), 16),
-          parseInt(v.slice(2, 4), 16),
-          parseInt(v.slice(4, 6), 16),
-        ];
-      }
+    const PINCH_ON=0.045,PINCH_OFF=0.075,DB=3;
+    const gestureState={Left:{active:false,confirmCount:0,pendingState:false},Right:{active:false,confirmCount:0,pendingState:false}};
+    function resolveGesture(lm,mode,label){
+      const gs=gestureState[label]||(gestureState[label]={active:false,confirmCount:0,pendingState:false});
+      let raw;
+      if(mode==='pinch'){const d=pinchDistance3D(lm);raw=!gs.active?d<PINCH_ON:d<PINCH_OFF}
+      else if(mode==='open'){raw=isHandOpen(lm)}else{raw=isIndexOnly(lm)}
+      if(raw===gs.pendingState){gs.confirmCount++;if(gs.confirmCount>=DB&&raw!==gs.active)gs.active=raw}
+      else{gs.pendingState=raw;gs.confirmCount=1}
+      return gs.active;
+    }
+    function resetGestureState(){['Left','Right'].forEach(l=>{gestureState[l]={active:false,confirmCount:0,pendingState:false}})}
 
-      function floodFill(ctx, sx, sy, fillColor) {
-        const { width: w, height: h } = ctx.canvas;
-        const img = ctx.getImageData(0, 0, w, h);
-        const d = img.data;
-        const px = (Math.round(sx) + Math.round(sy) * w) * 4;
-        const [tr, tg, tb] = [d[px], d[px + 1], d[px + 2]];
-        const [fr, fg, fb] = hexToRgb(fillColor);
-        if (tr === fr && tg === fg && tb === fb) return;
-        const stack = [[Math.round(sx), Math.round(sy)]];
-        const vis = new Uint8Array(w * h);
-        while (stack.length) {
-          const [cx, cy] = stack.pop();
-          if (cx < 0 || cx >= w || cy < 0 || cy >= h || vis[cx + cy * w])
-            continue;
-          const i = (cx + cy * w) * 4;
-          if (d[i] !== tr || d[i + 1] !== tg || d[i + 2] !== tb) continue;
-          vis[cx + cy * w] = 1;
-          d[i] = fr;
-          d[i + 1] = fg;
-          d[i + 2] = fb;
-          d[i + 3] = 255;
-          stack.push([cx + 1, cy], [cx - 1, cy], [cx, cy + 1], [cx, cy - 1]);
+    const hands=new Hands({locateFile:f=>`https://cdn.jsdelivr.net/npm/@mediapipe/hands/${f}`});
+    hands.setOptions({maxNumHands:2,modelComplexity:1,minDetectionConfidence:.7,minTrackingConfidence:.7});
+
+    hands.onResults((results)=>{
+      try{
+        /* loading progress via frame count — no extra init needed */
+        frameCount++;
+        if(frameCount===1){setStage('model')}
+        if(frameCount===4&&!firstRef.done){
+          firstRef.done=true;setStage('ready');
+          setTimeout(()=>{setStage('done');setModelReady(true)},400);
         }
-        ctx.putImageData(img, 0, 0);
-      }
 
-      function pinchDistance3D(lm) {
-        const t = lm[4],
-          i = lm[8];
-        return Math.hypot(i.x - t.x, i.y - t.y, (i.z || 0) - (t.z || 0));
-      }
-      function isHandOpen(lm) {
-        const fingers = [
-          [8, 6],
-          [12, 10],
-          [16, 14],
-          [20, 18],
-          [4, 2],
-        ];
-        let open = 0;
-        fingers.forEach(([tip, pip]) => {
-          if (lm[tip].y < lm[pip].y) open++;
-        });
-        return open >= 3;
-      }
-      function isIndexOnly(lm) {
-        const indexUp = lm[8].y < lm[6].y,
-          middleDown = lm[12].y > lm[10].y,
-          ringDown = lm[16].y > lm[14].y,
-          pinkyDown = lm[20].y > lm[18].y;
-        return indexUp && middleDown && ringDown && pinkyDown;
-      }
+        const el=containerRef.current;if(!el)return;
+        const w=el.clientWidth,h=el.clientHeight;
+        const overlayCanvas=overlayRef.current;if(!overlayCanvas)return;
+        if(!skelBufRef.current)skelBufRef.current=document.createElement('canvas');
+        const buf=skelBufRef.current;
+        if(buf.width!==overlayCanvas.width||buf.height!==overlayCanvas.height){buf.width=overlayCanvas.width;buf.height=overlayCanvas.height}
+        const octx=buf.getContext('2d');octx.clearRect(0,0,buf.width,buf.height);
+        const ovCtx=overlayCanvas.getContext('2d');
+        const mode=ctrlModeRef.current;
 
-      function drawSkeletonFn(ctx, hand, w, h, theme, showSkel) {
-        if (!showSkel || !hand) return;
-        const { joint, tip, glow } = theme;
-        ctx.strokeStyle = joint;
-        ctx.lineWidth = 2;
-        for (const [a, b] of HAND_CONNECTIONS) {
-          const pa = hand[a],
-            pb = hand[b];
-          ctx.beginPath();
-          ctx.moveTo((1 - pa.x) * w, pa.y * h);
-          ctx.lineTo((1 - pb.x) * w, pb.y * h);
-          ctx.stroke();
+        if(!results.multiHandLandmarks?.length){
+          delete smoothed['Left'];delete smoothed['Right'];resetGestureState();
+          setHandStatus({drawDetected:false,ctrlDetected:false,drawing:false});
+          ovCtx.clearRect(0,0,overlayCanvas.width,overlayCanvas.height);
+          const cc=cursorRef.current;if(cc)cc.getContext('2d').clearRect(0,0,cc.width,cc.height);
+          if(wasActive.current)endStroke();wasActive.current=false;
+          return;
         }
-        for (let i = 0; i < hand.length; i++) {
-          const p = hand[i],
-            x = (1 - p.x) * w,
-            y = p.y * h,
-            isTip = [4, 8, 12, 16, 20].includes(i);
-          ctx.beginPath();
-          ctx.arc(x, y, isTip ? 5 : 3, 0, Math.PI * 2);
-          ctx.fillStyle = isTip ? tip : joint;
-          ctx.fill();
-        }
-        const t = hand[8];
-        ctx.beginPath();
-        ctx.arc((1 - t.x) * w, t.y * h, 11, 0, Math.PI * 2);
-        ctx.strokeStyle = glow;
-        ctx.lineWidth = 1.5;
-        ctx.stroke();
-      }
 
-      function drawCtrlIndicatorFn(ctx, hand, w, h, active, mode) {
-        const wrist = hand[0],
-          wx = (1 - wrist.x) * w,
-          wy = wrist.y * h;
-        ctx.beginPath();
-        ctx.arc(wx, wy, 14, 0, Math.PI * 2);
-        ctx.strokeStyle = active
-          ? 'rgba(247,106,138,.9)'
-          : 'rgba(247,106,138,.25)';
-        ctx.lineWidth = active ? 2.5 : 1;
-        ctx.stroke();
-        if (mode === 'pinch') {
-          const t4x = (1 - hand[4].x) * w,
-            t4y = hand[4].y * h,
-            t8x = (1 - hand[8].x) * w,
-            t8y = hand[8].y * h;
-          ctx.beginPath();
-          ctx.moveTo(t4x, t4y);
-          ctx.lineTo(t8x, t8y);
-          ctx.strokeStyle = active
-            ? 'rgba(247,106,138,.9)'
-            : 'rgba(247,106,138,.3)';
-          ctx.lineWidth = active ? 2 : 1;
-          ctx.setLineDash([3, 3]);
-          ctx.stroke();
-          ctx.setLineDash([]);
-          const mx = (t4x + t8x) / 2,
-            my = (t4y + t8y) / 2;
-          ctx.beginPath();
-          ctx.arc(mx, my, active ? 4 : 2, 0, Math.PI * 2);
-          ctx.fillStyle = active ? '#f76a8a' : 'rgba(247,106,138,.4)';
-          ctx.fill();
-        }
-        const labels = {
-          pinch: active ? 'PINCH' : 'OPEN',
-          open: active ? 'DRAW' : 'FIST',
-          single: active ? 'DRAW' : 'FIST',
-        };
-        ctx.font = '10px monospace';
-        ctx.fillStyle = active ? '#f76a8a' : 'rgba(247,106,138,.4)';
-        ctx.textAlign = 'center';
-        ctx.fillText(labels[mode] || '', wx, wy + 26);
-        ctx.textAlign = 'left';
-      }
+        const activeLabels=new Set();
+        results.multiHandedness.forEach(hd=>activeLabels.add(hd.label));
+        ['Left','Right'].forEach(l=>{if(!activeLabels.has(l)){delete smoothed[l];gestureState[l]={active:false,confirmCount:0,pendingState:false}}});
 
-      let layerCount = 1;
-      const mkLayer = (n) => ({
-        id: crypto.randomUUID(),
-        name: n || `Layer ${++layerCount}`,
-        visible: true,
-      });
-
-      // ── History Manager ────────────────────────────────────────────────────────────
-      // Stores snapshots of all layer offscreen canvases as ImageData blobs.
-      // Each entry: { layerSnapshots: { [layerId]: ImageData }, layerOrder: [...ids], activeId }
-      class HistoryManager {
-        constructor() {
-          this.stack = [];
-          this.cursor = -1;
-        }
-        // Capture current state from offscreens + layer array
-        snapshot(offscreens, layers, activeId) {
-          const entry = {
-            layerSnapshots: {},
-            layerOrder: layers.map((l) => ({
-              id: l.id,
-              name: l.name,
-              visible: l.visible,
-            })),
-            activeId,
-          };
-          for (const l of layers) {
-            const oc = offscreens[l.id];
-            if (oc) {
-              entry.layerSnapshots[l.id] = oc
-                .getContext('2d')
-                .getImageData(0, 0, oc.width, oc.height);
-            }
-          }
-          // Truncate future if we branched
-          if (this.cursor < this.stack.length - 1)
-            this.stack = this.stack.slice(0, this.cursor + 1);
-          this.stack.push(entry);
-          if (this.stack.length > MAX_HISTORY) this.stack.shift();
-          else this.cursor++;
-        }
-        canUndo() {
-          return this.cursor > 0;
-        }
-        canRedo() {
-          return this.cursor < this.stack.length - 1;
-        }
-        undo() {
-          if (this.canUndo()) this.cursor--;
-          return this.stack[this.cursor];
-        }
-        redo() {
-          if (this.canRedo()) this.cursor++;
-          return this.stack[this.cursor];
-        }
-        current() {
-          return this.stack[this.cursor];
-        }
-        getAll() {
-          return this.stack;
-        }
-        getCursor() {
-          return this.cursor;
-        }
-      }
-
-      // ── APP ───────────────────────────────────────────────────────────────────────
-      function App() {
-        const [tool, setTool] = useState('pencil');
-        const [color, setColor] = useState('#7c6af7');
-        const [size, setSize] = useState(8);
-        const [opacity, setOp] = useState(100);
-        const [layers, setLayers] = useState([
-          { id: 'l1', name: 'Layer 1', visible: true },
-        ]);
-        const [activeId, setActiveId] = useState('l1');
-        const [showSkel, setShowSkel] = useState(true);
-        const [showCam, setShowCam] = useState(true);
-        const [drawHand, setDrawHand] = useState(defaultHand);
-        const [ctrlMode, setCtrlMode] = useState(defaultMode);
-        const [handStatus, setHandStatus] = useState({
-          drawDetected: false,
-          ctrlDetected: false,
-          drawing: false,
-        });
-        const [pipPos, setPipPos] = useState({ x: 20, y: 20 });
-        const [pipSize, setPipSize] = useState({ w: 220, h: 165 });
-        const [smoothStrength, setSmoothStrength] = useState(75);
-        const [coords, setCoords] = useState({ x: 0, y: 0 });
-        const [histCursor, setHistCursor] = useState(0); // triggers UI re-renders for history
-        const [histLen, setHistLen] = useState(1);
-        const [toast, setToast] = useState({ msg: '', show: false });
-        const [dragLayerId, setDragLayerId] = useState(null);
-        const [dragOverIdx, setDragOverIdx] = useState(null);
-
-        const drawRef = useRef(null);
-        const liveRef = useRef(null); // scratch canvas: current in-progress stroke only
-        const overlayRef = useRef(null);
-        const skelBufferRef = useRef(null);
-        const cursorRef = useRef(null);
-        const containerRef = useRef(null);
-        const videoRef = useRef(null);
-        const offscreens = useRef({});
-        const isDrawingRef = useRef(false);
-        const prevPt = useRef(null);
-        const wasActive = useRef(false);
-        const histMgr = useRef(new HistoryManager());
-        const pendingSnapshot = useRef(false);
-        const lastHandStatus = useRef({
-          drawDetected: false,
-          ctrlDetected: false,
-          drawing: false,
+        let drawLM=null,ctrlLM=null,drawLabel=null,ctrlLabel=null;
+        results.multiHandedness.forEach((hd,idx)=>{
+          const userSide=hd.label==='Left'?'Right':'Left';
+          const lm=smoothLandmarks(hd.label,results.multiHandLandmarks[idx]);
+          if(!validLM(lm))return;
+          if(userSide===drawHandRef.current){drawLM=lm;drawLabel=hd.label}
+          else{ctrlLM=lm;ctrlLabel=hd.label}
         });
 
-        const toolRef = useRef(tool);
-        toolRef.current = tool;
-        const colorRef = useRef(color);
-        colorRef.current = color;
-        const sizeRef = useRef(size);
-        sizeRef.current = size;
-        const opRef = useRef(opacity);
-        opRef.current = opacity;
-        const activeRef = useRef(activeId);
-        activeRef.current = activeId;
-        const layersRef = useRef(layers);
-        layersRef.current = layers;
-        const showSkelRef = useRef(showSkel);
-        showSkelRef.current = showSkel;
-        const drawHandRef = useRef(drawHand);
-        drawHandRef.current = drawHand;
-        const ctrlModeRef = useRef(ctrlMode);
-        ctrlModeRef.current = ctrlMode;
-        const smoothRef = useRef(smoothStrength);
-        smoothRef.current = smoothStrength;
+        const effectiveCtrlLM=mode==='single'?drawLM:ctrlLM;
+        const effectiveCtrlLabel=mode==='single'?drawLabel:ctrlLabel;
 
-        // ── Toast helper ────────────────────────────────────────────────────────────
-        const showToast = useCallback((msg) => {
-          setToast({ msg, show: true });
-          setTimeout(() => setToast((t) => ({ ...t, show: false })), 1400);
-        }, []);
+        if(validLM(drawLM))drawSkeletonFn(octx,drawLM,w,h,{joint:'rgba(124,106,247,.6)',tip:'#7c6af7',glow:'rgba(255,255,255,.35)'},showSkelRef.current);
+        if(mode!=='single'&&validLM(ctrlLM))drawSkeletonFn(octx,ctrlLM,w,h,{joint:'rgba(247,106,138,.5)',tip:'#f76a8a',glow:'rgba(247,106,138,.4)'},showSkelRef.current);
 
-        // ── History snapshot + UI sync ──────────────────────────────────────────────
-        const commitSnapshot = useCallback(() => {
-          histMgr.current.snapshot(
-            offscreens.current,
-            layersRef.current,
-            activeRef.current
-          );
-          setHistCursor(histMgr.current.getCursor());
-          setHistLen(histMgr.current.getAll().length);
-        }, []);
+        const shouldDraw=validLM(effectiveCtrlLM)&&effectiveCtrlLabel?resolveGesture(effectiveCtrlLM,mode,effectiveCtrlLabel):false;
+        if(validLM(effectiveCtrlLM)){
+          const rawActive=mode==='pinch'?pinchDistance3D(effectiveCtrlLM)<PINCH_OFF:(mode==='open'?isHandOpen(effectiveCtrlLM):isIndexOnly(effectiveCtrlLM));
+          drawCtrlIndicatorFn(octx,effectiveCtrlLM,w,h,rawActive,mode);
+        }
 
-        // Restore a history entry into offscreens + layer state
-        const restoreEntry = useCallback((entry) => {
-          if (!entry) return;
-          const el = containerRef.current;
-          if (!el) return;
-          const w = el.clientWidth,
-            h = el.clientHeight;
-          // Ensure offscreen canvases exist for all layers in the entry
-          for (const meta of entry.layerOrder) {
-            if (!offscreens.current[meta.id]) {
-              const oc = document.createElement('canvas');
-              oc.width = w;
-              oc.height = h;
-              offscreens.current[meta.id] = oc;
-            }
-            const oc = offscreens.current[meta.id];
-            const imgData = entry.layerSnapshots[meta.id];
-            if (imgData) {
-              // Resize if needed
-              if (oc.width !== w || oc.height !== h) {
-                oc.width = w;
-                oc.height = h;
-              }
-              oc.getContext('2d').putImageData(imgData, 0, 0);
-            } else {
-              oc.getContext('2d').clearRect(0, 0, oc.width, oc.height);
-            }
-          }
-          setLayers(entry.layerOrder.map((m) => ({ ...m })));
-          setActiveId(entry.activeId);
-        }, []);
+        ovCtx.clearRect(0,0,overlayCanvas.width,overlayCanvas.height);
+        ovCtx.drawImage(buf,0,0);
+        setHandStatus({drawDetected:validLM(drawLM),ctrlDetected:mode==='single'?validLM(drawLM):validLM(ctrlLM),drawing:shouldDraw});
 
-        const undo = useCallback(() => {
-          if (!histMgr.current.canUndo()) {
-            showToast('Nothing to undo');
-            return;
-          }
-          const entry = histMgr.current.undo();
-          restoreEntry(entry);
-          setHistCursor(histMgr.current.getCursor());
-          composite();
-          showToast('⌫ Undo');
-        }, [restoreEntry, showToast]);
+        if(validLM(drawLM)){
+          const tipX=(1-drawLM[8].x)*w,tipY=drawLM[8].y*h;
+          drawCursor(tipX,tipY);
+          if(shouldDraw){if(!wasActive.current)beginStroke(tipX,tipY);else continueStroke(tipX,tipY);prevPt.current={x:tipX,y:tipY}}
+          else{if(wasActive.current)endStroke();prevPt.current=null}
+          wasActive.current=shouldDraw;
+        }else{
+          const cc=cursorRef.current;if(cc)cc.getContext('2d').clearRect(0,0,cc.width,cc.height);
+          if(wasActive.current)endStroke();wasActive.current=false;
+        }
+      }catch(err){console.warn('MP frame error:',err.message)}
+    });
 
-        const redo = useCallback(() => {
-          if (!histMgr.current.canRedo()) {
-            showToast('Nothing to redo');
-            return;
-          }
-          const entry = histMgr.current.redo();
-          restoreEntry(entry);
-          setHistCursor(histMgr.current.getCursor());
-          composite();
-          showToast('↷ Redo');
-        }, [restoreEntry, showToast]);
+    cam=new Camera(video,{onFrame:async()=>{await hands.send({image:video})},width:640,height:480});
+    cam.start().catch(console.error);
+    return()=>{cam?.stop();hands.onResults(()=>{})};
+  },[]);
 
-        // ── offscreen canvas ────────────────────────────────────────────────────────
-        const getOC = (id) => {
-          if (!offscreens.current[id]) {
-            const el = containerRef.current;
-            const w = el?.clientWidth || 800,
-              h = el?.clientHeight || 600;
-            const oc = document.createElement('canvas');
-            oc.width = w;
-            oc.height = h;
-            offscreens.current[id] = oc;
-          }
-          return offscreens.current[id];
-        };
+  /* PiP drag/resize */
+  const pipDragRef=useRef(null),pipSzRef=useRef(null);
+  const onPipMouseDown=(e)=>{if(e.target.classList.contains('pip-resize')||e.target.classList.contains('pip-close'))return;e.preventDefault();pipDragRef.current={startX:e.clientX,startY:e.clientY,origX:pipPos.x,origY:pipPos.y};const mv=(me)=>{if(!pipDragRef.current)return;setPipPos({x:Math.max(0,pipDragRef.current.origX+me.clientX-pipDragRef.current.startX),y:Math.max(0,pipDragRef.current.origY+me.clientY-pipDragRef.current.startY)})};const up=()=>{pipDragRef.current=null;window.removeEventListener('mousemove',mv);window.removeEventListener('mouseup',up)};window.addEventListener('mousemove',mv);window.addEventListener('mouseup',up)};
+  const onPipResizeDown=(e)=>{e.preventDefault();e.stopPropagation();pipSzRef.current={startX:e.clientX,origW:pipSize.w};const mv=(me)=>{if(!pipSzRef.current)return;const nw=Math.max(120,pipSzRef.current.origW+me.clientX-pipSzRef.current.startX);setPipSize({w:nw,h:Math.round(nw*.75)})};const up=()=>{pipSzRef.current=null;window.removeEventListener('mousemove',mv);window.removeEventListener('mouseup',up)};window.addEventListener('mousemove',mv);window.addEventListener('mouseup',up)};
 
-        // Full composite: flatten committed layers onto drawCanvas.
-        // Only called on stroke end, clear, undo/redo — NOT mid-stroke.
-        const composite = useCallback(() => {
-          const c = drawRef.current;
-          if (!c) return;
-          const ctx = c.getContext('2d');
-          ctx.clearRect(0, 0, c.width, c.height);
-          for (const l of layersRef.current) {
-            if (!l.visible) continue;
-            const oc = offscreens.current[l.id];
-            if (oc) ctx.drawImage(oc, 0, 0);
-          }
-          if (liveRef.current) ctx.drawImage(liveRef.current, 0, 0);
-        }, []);
+  const previewRef=useRef(null);
+  useEffect(()=>{const c=previewRef.current;if(!c)return;const ctx=c.getContext('2d');ctx.clearRect(0,0,c.width,c.height);ctx.globalAlpha=opacity/100;ctx.beginPath();ctx.arc(c.width/2,c.height/2,Math.max(size/2,2),0,Math.PI*2);if(tool==='brush'){ctx.shadowBlur=size;ctx.shadowColor=color}ctx.fillStyle=tool==='eraser'?'rgba(248,113,113,.7)':color;ctx.fill()},[size,color,tool,opacity]);
 
-        // Fast per-frame blit: committed layers already on drawCanvas + live stroke.
-        const blitLive = useCallback(() => {
-          const c = drawRef.current;
-          if (!c) return;
-          const ctx = c.getContext('2d');
-          ctx.clearRect(0, 0, c.width, c.height);
-          for (const l of layersRef.current) {
-            if (!l.visible) continue;
-            const oc = offscreens.current[l.id];
-            if (oc) ctx.drawImage(oc, 0, 0);
-          }
-          if (liveRef.current) ctx.drawImage(liveRef.current, 0, 0);
-        }, []);
+  const clearAll=()=>{Object.values(offscreens.current).forEach(oc=>{if(oc)oc.getContext('2d').clearRect(0,0,oc.width,oc.height)});composite();commitSnap();showToast('Cleared')};
+  const clearLayer=()=>{const oc=offscreens.current[activeRef.current];if(oc)oc.getContext('2d').clearRect(0,0,oc.width,oc.height);composite();commitSnap();showToast('Layer cleared')};
+  const exportImg=()=>{const c=drawRef.current;if(!c)return;const a=document.createElement('a');a.href=c.toDataURL('image/png');a.download='finger-paint.png';a.click()};
+  const addLayer=()=>{const l=mkLayer();setLayers(p=>[...p,l]);setActiveId(l.id);setTimeout(()=>commitSnap(),50)};
+  const toggleVis=(id)=>{setLayers(p=>p.map(l=>l.id===id?{...l,visible:!l.visible}:l));setTimeout(()=>{composite();commitSnap()},0)};
+  const lum=(hex)=>{const[r,g,b]=hexToRgb(hex);return r*.299+g*.587+b*.114};
 
-        const getCtx = useCallback(() => {
-          const oc = getOC(activeRef.current);
-          return oc ? oc.getContext('2d') : null;
-        }, []);
+  const sc=handStatus.drawing?'#4ade80':handStatus.drawDetected?'#fbbf24':'#64748b';
+  const statusLabel=handStatus.drawing?'Drawing ✦':handStatus.drawDetected?'Ready':'No hand';
+  const activeModeConf=CTRL_MODES.find(m=>m.id===ctrlMode);
+  const ctrlStateLabel=()=>{if(!handStatus.ctrlDetected)return'—';if(handStatus.drawing)return ctrlMode==='pinch'?'Pinching ✦':'Active ✦';return ctrlMode==='pinch'?'Released':ctrlMode==='open'?'Closed':'Fist'};
+  const canUndo=histCur>0,canRedo=histCur<histLen-1;
 
-        // ── resize ──────────────────────────────────────────────────────────────────
-        useEffect(() => {
-          const resize = () => {
-            const el = containerRef.current;
-            if (!el) return;
-            const w = el.clientWidth,
-              h = el.clientHeight;
-            [drawRef, liveRef, overlayRef, cursorRef].forEach((r) => {
-              if (r.current) {
-                r.current.width = w;
-                r.current.height = h;
-              }
-            });
-            if (!skelBufferRef.current) {
-              skelBufferRef.current = document.createElement('canvas');
-            }
-            skelBufferRef.current.width = w;
-            skelBufferRef.current.height = h;
-            layersRef.current.forEach((l) => {
-              if (!offscreens.current[l.id]) {
-                const oc = document.createElement('canvas');
-                oc.width = w;
-                oc.height = h;
-                offscreens.current[l.id] = oc;
-              }
-            });
-            composite();
-          };
-          resize();
-          window.addEventListener('resize', resize);
-          return () => window.removeEventListener('resize', resize);
-        }, [composite]);
-
-        useEffect(() => {
-          const el = containerRef.current;
-          const w = el?.clientWidth || 800,
-            h = el?.clientHeight || 600;
-          layers.forEach((l) => {
-            if (!offscreens.current[l.id]) {
-              const oc = document.createElement('canvas');
-              oc.width = w;
-              oc.height = h;
-              offscreens.current[l.id] = oc;
-            }
-          });
-        }, [layers]);
-
-        // Seed initial history after mount
-        useEffect(() => {
-          // Small delay to let canvases initialise
-          setTimeout(() => {
-            commitSnapshot();
-          }, 200);
-          // eslint-disable-next-line react-hooks/exhaustive-deps
-        }, []);
-
-        // ── brush ────────────────────────────────────────────────────────────────────
-        const applyBrush = (ctx) => {
-          const t = toolRef.current,
-            s = sizeRef.current,
-            op = opRef.current / 100;
-          ctx.globalAlpha = op;
-          ctx.lineCap = 'round';
-          ctx.lineJoin = 'round';
-          ctx.shadowBlur = 0;
-          if (t === 'eraser') {
-            ctx.globalCompositeOperation = 'destination-out';
-            ctx.strokeStyle = 'rgba(0,0,0,1)';
-            ctx.lineWidth = s;
-            return;
-          }
-          ctx.globalCompositeOperation = 'source-over';
-          ctx.strokeStyle = colorRef.current;
-          if (t === 'brush') {
-            ctx.globalAlpha = op * 0.65;
-            ctx.lineWidth = s * 2.5;
-            ctx.shadowBlur = s;
-            ctx.shadowColor = colorRef.current;
-          } else if (t === 'marker') {
-            ctx.globalAlpha = op * 0.85;
-            ctx.lineWidth = s * 1.8;
-          } else {
-            ctx.lineWidth = s;
-          }
-        };
-        const resetCtx = (ctx) => {
-          ctx.globalCompositeOperation = 'source-over';
-          ctx.globalAlpha = 1;
-          ctx.shadowBlur = 0;
-        };
-
-        // liveCtx: draw in-progress stroke here so we don't dirty the offscreen mid-stroke
-        const getLiveCtx = () => {
-          const lc = liveRef.current;
-          if (!lc) return null;
-          return lc.getContext('2d');
-        };
-
-        const beginStroke = (x, y) => {
-          const lc = getLiveCtx();
-          if (!lc) return;
-          lc.clearRect(0, 0, lc.canvas.width, lc.canvas.height);
-          applyBrush(lc);
-          lc.beginPath();
-          lc.moveTo(x, y);
-          prevPt.current = { x, y };
-          isDrawingRef.current = true;
-          pendingSnapshot.current = true;
-        };
-
-        const continueStroke = (x, y) => {
-          const lc = getLiveCtx();
-          if (!lc || !prevPt.current) return;
-          // Quadratic curve through midpoint for smoother lines at speed
-          const mx = (prevPt.current.x + x) / 2,
-            my = (prevPt.current.y + y) / 2;
-          lc.quadraticCurveTo(prevPt.current.x, prevPt.current.y, mx, my);
-          lc.stroke();
-          // Continue path from midpoint so next segment connects cleanly
-          lc.beginPath();
-          lc.moveTo(mx, my);
-          prevPt.current = { x, y };
-          blitLive(); // cheap: just redraw committed + live canvas
-        };
-
-        const endStroke = () => {
-          const lc = getLiveCtx();
-          if (lc) {
-            // Flush final point
-            if (prevPt.current) {
-              lc.lineTo(prevPt.current.x, prevPt.current.y);
-              lc.stroke();
-            }
-            resetCtx(lc);
-            // Merge live stroke into the active offscreen layer (liveRef already has correct pixels)
-            const oc = offscreens.current[activeRef.current];
-            if (oc) {
-              const octx = oc.getContext('2d');
-              octx.globalCompositeOperation = 'source-over';
-              octx.globalAlpha = 1;
-              octx.drawImage(lc.canvas, 0, 0);
-            }
-            lc.clearRect(0, 0, lc.canvas.width, lc.canvas.height);
-          }
-          prevPt.current = null;
-          isDrawingRef.current = false;
-          composite();
-          if (pendingSnapshot.current) {
-            pendingSnapshot.current = false;
-            commitSnapshot();
-          }
-        };
-
-        // ── cursor ───────────────────────────────────────────────────────────────────
-        const drawCursor = useCallback((x, y) => {
-          const c = cursorRef.current;
-          if (!c) return;
-          const ctx = c.getContext('2d');
-          ctx.clearRect(0, 0, c.width, c.height);
-          ctx.beginPath();
-          ctx.arc(x, y, Math.max(sizeRef.current / 2, 4), 0, Math.PI * 2);
-          ctx.strokeStyle = 'rgba(255,255,255,.6)';
-          ctx.lineWidth = 1;
-          ctx.stroke();
-          ctx.beginPath();
-          ctx.arc(x, y, 2, 0, Math.PI * 2);
-          ctx.fillStyle =
-            toolRef.current === 'eraser' ? '#f87171' : colorRef.current;
-          ctx.fill();
-        }, []);
-
-        // ── mouse/touch ──────────────────────────────────────────────────────────────
-        const toXY = (e) => {
-          const c = drawRef.current;
-          if (!c) return { x: 0, y: 0 };
-          const r = c.getBoundingClientRect();
-          const cx = 'touches' in e ? e.touches[0].clientX : e.clientX;
-          const cy = 'touches' in e ? e.touches[0].clientY : e.clientY;
-          return {
-            x: (cx - r.left) * (c.width / r.width),
-            y: (cy - r.top) * (c.height / r.height),
-          };
-        };
-        const onDown = (e) => {
-          const { x, y } = toXY(e);
-          if (toolRef.current === 'fill') {
-            const ctx = getCtx();
-            if (ctx) {
-              floodFill(ctx, x, y, colorRef.current);
-              composite();
-              commitSnapshot();
-            }
-            return;
-          }
-          if (toolRef.current === 'eye') {
-            const c = drawRef.current;
-            if (!c) return;
-            const d = c
-              .getContext('2d')
-              .getImageData(Math.round(x), Math.round(y), 1, 1).data;
-            if (d[3] > 0)
-              setColor(
-                '#' +
-                  [d[0], d[1], d[2]]
-                    .map((v) => v.toString(16).padStart(2, '0'))
-                    .join('')
-              );
-            setTool('pencil');
-            return;
-          }
-          beginStroke(x, y);
-        };
-        const onMove = (e) => {
-          const { x, y } = toXY(e);
-          setCoords({ x: Math.round(x), y: Math.round(y) });
-          drawCursor(x, y);
-          if (isDrawingRef.current) continueStroke(x, y);
-        };
-        const onUp = () => endStroke();
-
-        // ── keyboard shortcuts ───────────────────────────────────────────────────────
-        useEffect(() => {
-          const h = (e) => {
-            if (e.target.tagName === 'INPUT') return;
-            // Undo / Redo
-            if ((e.ctrlKey || e.metaKey) && e.key === 'z') {
-              e.preventDefault();
-              if (e.shiftKey) redo();
-              else undo();
-              return;
-            }
-            if ((e.ctrlKey || e.metaKey) && e.key === 'y') {
-              e.preventDefault();
-              redo();
-              return;
-            }
-            TOOLS.forEach((t) => {
-              if (e.key.toUpperCase() === t.key) setTool(t.id);
-            });
-          };
-          window.addEventListener('keydown', h);
-          return () => window.removeEventListener('keydown', h);
-        }, [undo, redo]);
-
-        // ── MediaPipe ────────────────────────────────────────────────────────────────
-        useEffect(() => {
-          const video = videoRef.current;
-          if (!video) return;
-          let cam;
-          const smoothed = {};
-          function smoothLandmarks(label, raw) {
-            if (!raw || raw.length < 21) return null;
-            const SMOOTH = smoothRef.current / 100;
-            const prev = smoothed[label];
-            if (!prev || prev.length < 21) {
-              smoothed[label] = raw.map((p) => ({
-                x: p.x,
-                y: p.y,
-                z: p.z || 0,
-              }));
-              return smoothed[label];
-            }
-            smoothed[label] = raw.map((p, i) => ({
-              x: SMOOTH * p.x + (1 - SMOOTH) * prev[i].x,
-              y: SMOOTH * p.y + (1 - SMOOTH) * prev[i].y,
-              z: SMOOTH * (p.z || 0) + (1 - SMOOTH) * prev[i].z,
-            }));
-            return smoothed[label];
-          }
-          function validLM(lm) {
-            return (
-              lm &&
-              lm.length === 21 &&
-              lm.every((p) => p && typeof p.x === 'number')
-            );
-          }
-          const PINCH_ON = 0.045,
-            PINCH_OFF = 0.075,
-            DEBOUNCE_FRAMES = 3;
-          const gestureState = {
-            Left: { active: false, confirmCount: 0, pendingState: false },
-            Right: { active: false, confirmCount: 0, pendingState: false },
-          };
-          function resolveGesture(lm, mode, label) {
-            const gs =
-              gestureState[label] ||
-              (gestureState[label] = {
-                active: false,
-                confirmCount: 0,
-                pendingState: false,
-              });
-            let rawSignal;
-            if (mode === 'pinch') {
-              const dist = pinchDistance3D(lm);
-              rawSignal = !gs.active ? dist < PINCH_ON : dist < PINCH_OFF;
-            } else if (mode === 'open') {
-              rawSignal = isHandOpen(lm);
-            } else {
-              rawSignal = isIndexOnly(lm);
-            }
-            if (rawSignal === gs.pendingState) {
-              gs.confirmCount++;
-              if (gs.confirmCount >= DEBOUNCE_FRAMES && rawSignal !== gs.active)
-                gs.active = rawSignal;
-            } else {
-              gs.pendingState = rawSignal;
-              gs.confirmCount = 1;
-            }
-            return gs.active;
-          }
-          function resetGestureState() {
-            ['Left', 'Right'].forEach((l) => {
-              gestureState[l] = {
-                active: false,
-                confirmCount: 0,
-                pendingState: false,
-              };
-            });
-          }
-          const hands = new Hands({
-            locateFile: (f) =>
-              `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${f}`,
-          });
-          hands.setOptions({
-            maxNumHands: 2,
-            modelComplexity: 0,
-            minDetectionConfidence: 0.65,
-            minTrackingConfidence: 0.65,
-          });
-          hands.onResults((results) => {
-            try {
-              const el = containerRef.current;
-              if (!el) return;
-              const w = el.clientWidth,
-                h = el.clientHeight;
-              const overlayCanvas = overlayRef.current;
-              if (!overlayCanvas) return;
-              if (!skelBufferRef.current) {
-                skelBufferRef.current = document.createElement('canvas');
-              }
-              const buf = skelBufferRef.current;
-              if (
-                buf.width !== overlayCanvas.width ||
-                buf.height !== overlayCanvas.height
-              ) {
-                buf.width = overlayCanvas.width;
-                buf.height = overlayCanvas.height;
-              }
-              const octx = buf.getContext('2d');
-              octx.clearRect(0, 0, buf.width, buf.height);
-              const ovCtx = overlayCanvas.getContext('2d');
-              const mode = ctrlModeRef.current;
-              if (!results.multiHandLandmarks?.length) {
-                delete smoothed['Left'];
-                delete smoothed['Right'];
-                resetGestureState();
-                if (
-                  lastHandStatus.current.drawDetected ||
-                  lastHandStatus.current.ctrlDetected ||
-                  lastHandStatus.current.drawing
-                ) {
-                  lastHandStatus.current = {
-                    drawDetected: false,
-                    ctrlDetected: false,
-                    drawing: false,
-                  };
-                  setHandStatus({
-                    drawDetected: false,
-                    ctrlDetected: false,
-                    drawing: false,
-                  });
-                }
-                ovCtx.clearRect(
-                  0,
-                  0,
-                  overlayCanvas.width,
-                  overlayCanvas.height
-                );
-                const cc = cursorRef.current;
-                if (cc)
-                  cc.getContext('2d').clearRect(0, 0, cc.width, cc.height);
-                if (wasActive.current) endStroke();
-                wasActive.current = false;
-                return;
-              }
-              const activeLabels = new Set();
-              results.multiHandedness.forEach((hd) =>
-                activeLabels.add(hd.label)
-              );
-              ['Left', 'Right'].forEach((l) => {
-                if (!activeLabels.has(l)) {
-                  delete smoothed[l];
-                  gestureState[l] = {
-                    active: false,
-                    confirmCount: 0,
-                    pendingState: false,
-                  };
-                }
-              });
-              let drawLM = null,
-                ctrlLM = null,
-                drawLabel = null,
-                ctrlLabel = null;
-              results.multiHandedness.forEach((hd, idx) => {
-                const userSide = hd.label === 'Left' ? 'Right' : 'Left';
-                const raw = results.multiHandLandmarks[idx];
-                const lm = smoothLandmarks(hd.label, raw);
-                if (!validLM(lm)) return;
-                if (userSide === drawHandRef.current) {
-                  drawLM = lm;
-                  drawLabel = hd.label;
-                } else {
-                  ctrlLM = lm;
-                  ctrlLabel = hd.label;
-                }
-              });
-              const effectiveCtrlLM = mode === 'single' ? drawLM : ctrlLM;
-              const effectiveCtrlLabel =
-                mode === 'single' ? drawLabel : ctrlLabel;
-              if (validLM(drawLM))
-                drawSkeletonFn(
-                  octx,
-                  drawLM,
-                  w,
-                  h,
-                  {
-                    joint: 'rgba(124,106,247,.6)',
-                    tip: '#7c6af7',
-                    glow: 'rgba(255,255,255,.35)',
-                  },
-                  showSkelRef.current
-                );
-              if (mode !== 'single' && validLM(ctrlLM))
-                drawSkeletonFn(
-                  octx,
-                  ctrlLM,
-                  w,
-                  h,
-                  {
-                    joint: 'rgba(247,106,138,.5)',
-                    tip: '#f76a8a',
-                    glow: 'rgba(247,106,138,.4)',
-                  },
-                  showSkelRef.current
-                );
-              const shouldDraw =
-                validLM(effectiveCtrlLM) && effectiveCtrlLabel
-                  ? resolveGesture(effectiveCtrlLM, mode, effectiveCtrlLabel)
-                  : false;
-              if (validLM(effectiveCtrlLM)) {
-                const rawActive =
-                  mode === 'pinch'
-                    ? pinchDistance3D(effectiveCtrlLM) < PINCH_OFF
-                    : mode === 'open'
-                    ? isHandOpen(effectiveCtrlLM)
-                    : isIndexOnly(effectiveCtrlLM);
-                drawCtrlIndicatorFn(
-                  octx,
-                  effectiveCtrlLM,
-                  w,
-                  h,
-                  rawActive,
-                  mode
-                );
-              }
-              ovCtx.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
-              ovCtx.drawImage(buf, 0, 0);
-              const nextHS = {
-                drawDetected: validLM(drawLM),
-                ctrlDetected:
-                  mode === 'single' ? validLM(drawLM) : validLM(ctrlLM),
-                drawing: shouldDraw,
-              };
-              const prev = lastHandStatus.current;
-              if (
-                nextHS.drawDetected !== prev.drawDetected ||
-                nextHS.ctrlDetected !== prev.ctrlDetected ||
-                nextHS.drawing !== prev.drawing
-              ) {
-                lastHandStatus.current = nextHS;
-                setHandStatus(nextHS);
-              }
-              if (validLM(drawLM)) {
-                const tipX = (1 - drawLM[8].x) * w,
-                  tipY = drawLM[8].y * h;
-                drawCursor(tipX, tipY);
-                if (shouldDraw) {
-                  if (!wasActive.current) beginStroke(tipX, tipY);
-                  else continueStroke(tipX, tipY);
-                  prevPt.current = { x: tipX, y: tipY };
-                } else {
-                  if (wasActive.current) endStroke();
-                  prevPt.current = null;
-                }
-                wasActive.current = shouldDraw;
-              } else {
-                const cc = cursorRef.current;
-                if (cc)
-                  cc.getContext('2d').clearRect(0, 0, cc.width, cc.height);
-                if (wasActive.current) endStroke();
-                wasActive.current = false;
-              }
-            } catch (err) {
-              console.warn(
-                'Hand tracking frame error (recovered):',
-                err.message
-              );
-            }
-          });
-          cam = new Camera(video, {
-            onFrame: async () => {
-              await hands.send({ image: video });
-            },
-            width: 640,
-            height: 480,
-          });
-          cam.start().catch(console.error);
-          return () => {
-            cam?.stop();
-            hands.onResults(() => {});
-          };
-          // eslint-disable-next-line react-hooks/exhaustive-deps
-        }, []);
-
-        // ── PiP drag ─────────────────────────────────────────────────────────────────
-        const pipDragRef = useRef(null);
-        const pipSzRef = useRef(null);
-        const onPipMouseDown = (e) => {
-          if (
-            e.target.classList.contains('pip-resize') ||
-            e.target.classList.contains('pip-close')
-          )
-            return;
-          e.preventDefault();
-          pipDragRef.current = {
-            startX: e.clientX,
-            startY: e.clientY,
-            origX: pipPos.x,
-            origY: pipPos.y,
-          };
-          const onMove = (me) => {
-            if (!pipDragRef.current) return;
-            const dx = me.clientX - pipDragRef.current.startX,
-              dy = me.clientY - pipDragRef.current.startY;
-            setPipPos({
-              x: Math.max(0, pipDragRef.current.origX + dx),
-              y: Math.max(0, pipDragRef.current.origY + dy),
-            });
-          };
-          const onUp = () => {
-            pipDragRef.current = null;
-            window.removeEventListener('mousemove', onMove);
-            window.removeEventListener('mouseup', onUp);
-          };
-          window.addEventListener('mousemove', onMove);
-          window.addEventListener('mouseup', onUp);
-        };
-        const onPipResizeDown = (e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          pipSzRef.current = {
-            startX: e.clientX,
-            startY: e.clientY,
-            origW: pipSize.w,
-            origH: pipSize.h,
-          };
-          const onMove = (me) => {
-            if (!pipSzRef.current) return;
-            const dw = me.clientX - pipSzRef.current.startX,
-              nw = Math.max(120, pipSzRef.current.origW + dw);
-            setPipSize({ w: nw, h: Math.round(nw * 0.75) });
-          };
-          const onUp = () => {
-            pipSzRef.current = null;
-            window.removeEventListener('mousemove', onMove);
-            window.removeEventListener('mouseup', onUp);
-          };
-          window.addEventListener('mousemove', onMove);
-          window.addEventListener('mouseup', onUp);
-        };
-
-        // ── brush preview ─────────────────────────────────────────────────────────────
-        const previewRef = useRef(null);
-        useEffect(() => {
-          const c = previewRef.current;
-          if (!c) return;
-          const ctx = c.getContext('2d');
-          ctx.clearRect(0, 0, c.width, c.height);
-          ctx.globalAlpha = opacity / 100;
-          ctx.beginPath();
-          ctx.arc(
-            c.width / 2,
-            c.height / 2,
-            Math.max(size / 2, 2),
-            0,
-            Math.PI * 2
-          );
-          if (tool === 'brush') {
-            ctx.shadowBlur = size;
-            ctx.shadowColor = color;
-          }
-          ctx.fillStyle = tool === 'eraser' ? 'rgba(248,113,113,.7)' : color;
-          ctx.fill();
-        }, [size, color, tool, opacity]);
-
-        // ── Canvas actions ───────────────────────────────────────────────────────────
-        const clearAll = () => {
-          Object.values(offscreens.current).forEach((oc) => {
-            if (oc) oc.getContext('2d').clearRect(0, 0, oc.width, oc.height);
-          });
-          composite();
-          commitSnapshot();
-          showToast('Cleared all layers');
-        };
-        const clearLayer = () => {
-          const oc = offscreens.current[activeRef.current];
-          if (oc) oc.getContext('2d').clearRect(0, 0, oc.width, oc.height);
-          composite();
-          commitSnapshot();
-          showToast('Cleared layer');
-        };
-        const exportImg = () => {
-          const c = drawRef.current;
-          if (!c) return;
-          const a = document.createElement('a');
-          a.href = c.toDataURL('image/png');
-          a.download = 'finger-paint.png';
-          a.click();
-        };
-        const addLayer = () => {
-          const l = mkLayer();
-          setLayers((p) => [...p, l]);
-          setActiveId(l.id);
-          setTimeout(() => commitSnapshot(), 50);
-        };
-        const toggleVis = (id) => {
-          setLayers((p) =>
-            p.map((l) => (l.id === id ? { ...l, visible: !l.visible } : l))
-          );
-          setTimeout(() => {
-            composite();
-            commitSnapshot();
-          }, 0);
-        };
-
-        // ── Layer drag & drop ────────────────────────────────────────────────────────
-        // We store IDs in "display order" (reversed for rendering: top layer = last in array)
-        const onLayerDragStart = (e, id) => {
-          setDragLayerId(id);
-          e.dataTransfer.effectAllowed = 'move';
-          // ghost image
-          const ghost = document.createElement('div');
-          ghost.textContent = layers.find((l) => l.id === id)?.name || 'Layer';
-          ghost.style.cssText =
-            'position:fixed;top:-100px;background:#1a1a26;color:#f0eeff;padding:6px 12px;border-radius:6px;font-family:monospace;font-size:12px;border:1px solid rgba(124,106,247,.5);';
-          document.body.appendChild(ghost);
-          e.dataTransfer.setDragImage(ghost, 0, 0);
-          setTimeout(() => document.body.removeChild(ghost), 0);
-        };
-        const onLayerDragOver = (e, idx) => {
-          e.preventDefault();
-          e.dataTransfer.dropEffect = 'move';
-          setDragOverIdx(idx);
-        };
-        const onLayerDrop = (e, targetIdx) => {
-          e.preventDefault();
-          if (dragLayerId === null) return;
-          const displayLayers = [...layers].reverse(); // panel shows reversed
-          const fromIdx = displayLayers.findIndex((l) => l.id === dragLayerId);
-          if (fromIdx === -1 || fromIdx === targetIdx) {
-            setDragLayerId(null);
-            setDragOverIdx(null);
-            return;
-          }
-          const reordered = [...displayLayers];
-          const [moved] = reordered.splice(fromIdx, 1);
-          reordered.splice(targetIdx, 0, moved);
-          const newLayers = reordered.reverse();
-          setLayers(newLayers);
-          setTimeout(() => {
-            composite();
-            commitSnapshot();
-            showToast('Layer reordered');
-          }, 0);
-          setDragLayerId(null);
-          setDragOverIdx(null);
-        };
-        const onLayerDragEnd = () => {
-          setDragLayerId(null);
-          setDragOverIdx(null);
-        };
-
-        // Layer thumb updater (mini previews)
-        const layerThumbRefs = useRef({});
-        useEffect(() => {
-          const interval = setInterval(() => {
-            layersRef.current.forEach((l) => {
-              const oc = offscreens.current[l.id];
-              const tc = layerThumbRefs.current[l.id];
-              if (!oc || !tc) return;
-              const ctx = tc.getContext('2d');
-              ctx.clearRect(0, 0, tc.width, tc.height);
-              ctx.drawImage(oc, 0, 0, tc.width, tc.height);
-            });
-          }, 500);
-          return () => clearInterval(interval);
-        }, [layers]);
-
-        const lum = (hex) => {
-          const [r, g, b] = hexToRgb(hex);
-          return r * 0.299 + g * 0.587 + b * 0.114;
-        };
-        const sc = handStatus.drawing
-          ? '#4ade80'
-          : handStatus.drawDetected
-          ? '#fbbf24'
-          : '#64748b';
-        const statusLabel = handStatus.drawing
-          ? 'Drawing ✦'
-          : handStatus.drawDetected
-          ? 'Ready'
-          : 'No hand';
-        const activeModeConf = CTRL_MODES.find((m) => m.id === ctrlMode);
-        const ctrlStateLabel = () => {
-          if (!handStatus.ctrlDetected) return '—';
-          if (handStatus.drawing)
-            return ctrlMode === 'pinch' ? 'Pinching ✦' : 'Active ✦';
-          return ctrlMode === 'pinch'
-            ? 'Released'
-            : ctrlMode === 'open'
-            ? 'Closed'
-            : 'Fist';
-        };
-        const canUndo = histCursor > 0;
-        const canRedo = histCursor < histLen - 1;
-
-        const displayLayers = [...layers].reverse();
-
-        return (
-          <div className="app">
-            <header className="topbar">
-              <span className="logo">✦ FINGER PAINT STUDIO</span>
-              <div className="sep" />
-              <div className="toolbar-tools">
-                {TOOLS.map((t, i) => (
-                  <React.Fragment key={t.id}>
-                    {i === 3 && <div className="tsep" />}
-                    <button
-                      className={`tbtn2 ${tool === t.id ? 'active' : ''}`}
-                      title={`${t.label} (${t.key})`}
-                      onClick={() => setTool(t.id)}
-                    >
-                      <span>{t.icon}</span>
-                      <span className="tlbl">{t.label}</span>
-                    </button>
-                  </React.Fragment>
-                ))}
-              </div>
-              <div className="sep" />
-              {/* Undo / Redo */}
-              <button
-                className="tbtn undo-redo"
-                onClick={undo}
-                disabled={!canUndo}
-                title="Undo (Ctrl+Z)"
-              >
-                ↩ Undo
-                {canUndo && <span className="hist-badge">{histCursor}</span>}
-              </button>
-              <button
-                className="tbtn undo-redo"
-                onClick={redo}
-                disabled={!canRedo}
-                title="Redo (Ctrl+Shift+Z / Ctrl+Y)"
-              >
-                Redo ↪
-                {canRedo && (
-                  <span
-                    className="hist-badge"
-                    style={{ background: 'var(--accent2)' }}
-                  >
-                    {histLen - 1 - histCursor}
-                  </span>
-                )}
-              </button>
-              <div className="sep" />
-              <button className="tbtn danger" onClick={clearAll}>
-                ⌫ Clear All
-              </button>
-              <button className="tbtn" onClick={clearLayer}>
-                ⌫ Clear Layer
-              </button>
-              <button className="tbtn ok" onClick={exportImg}>
-                ↓ Export PNG
-              </button>
-              <div className="spacer" />
-              <div
-                className="pill"
-                style={{ borderColor: sc + '55', color: sc }}
-              >
-                <div className="dot" style={{ background: sc }} />
-                {statusLabel}
-              </div>
-              <div
-                className="pill"
-                style={{
-                  borderColor: 'rgba(247,106,138,.3)',
-                  color: 'var(--accent2)',
-                }}
-              >
-                <span>{activeModeConf.icon}</span>
-                <span>{activeModeConf.label}</span>
-              </div>
-            </header>
-
-            <main
-              className={`canvas-area ${tool}`}
-              ref={containerRef}
-              onPointerDown={onDown}
-              onPointerMove={onMove}
-              onPointerUp={onUp}
-              onPointerLeave={onUp}
-            >
-              <canvas ref={drawRef} id="drawCanvas" />
-              <canvas ref={liveRef} id="liveCanvas" />
-              <canvas ref={overlayRef} id="overlayCanvas" />
-              <canvas ref={cursorRef} id="cursorCanvas" />
-              {showCam ? (
-                <div
-                  className="pip-wrap"
-                  style={{
-                    left: pipPos.x,
-                    top: pipPos.y,
-                    width: pipSize.w,
-                    height: pipSize.h,
-                  }}
-                  onMouseDown={onPipMouseDown}
-                >
-                  <video ref={videoRef} autoPlay playsInline muted />
-                  <div className="pip-bar">
-                    <span className="pip-label">📷 CAM</span>
-                    <button
-                      className="pip-close"
-                      onClick={() => setShowCam(false)}
-                    >
-                      ✕
-                    </button>
-                  </div>
-                  <svg
-                    className="pip-resize"
-                    viewBox="0 0 10 10"
-                    onMouseDown={onPipResizeDown}
-                  >
-                    <line
-                      x1="3"
-                      y1="10"
-                      x2="10"
-                      y2="3"
-                      stroke="white"
-                      strokeWidth="1.5"
-                    />
-                    <line
-                      x1="6"
-                      y1="10"
-                      x2="10"
-                      y2="6"
-                      stroke="white"
-                      strokeWidth="1.5"
-                    />
-                  </svg>
-                </div>
-              ) : (
-                <video
-                  ref={videoRef}
-                  autoPlay
-                  playsInline
-                  muted
-                  style={{
-                    position: 'absolute',
-                    width: 1,
-                    height: 1,
-                    opacity: 0,
-                    pointerEvents: 'none',
-                  }}
-                />
-              )}
-            </main>
-
-            <aside className="panel">
-              {/* COLORS */}
-              <div className="psec">
-                <div className="ptitle">Color Palette</div>
-                <div className="cgrid">
-                  {PALETTE.map((c) => (
-                    <div
-                      key={c}
-                      className={`cswatch ${color === c ? 'active' : ''}`}
-                      style={{ background: c }}
-                      onClick={() => setColor(c)}
-                    />
-                  ))}
-                </div>
-                <div className="cprow">
-                  <span className="cplabel">Custom:</span>
-                  <input
-                    type="color"
-                    className="cpinput"
-                    value={color}
-                    onChange={(e) => setColor(e.target.value)}
-                  />
-                  <div className="ccblock" style={{ background: color }}>
-                    <span
-                      style={{
-                        fontSize: 9,
-                        fontWeight: 600,
-                        letterSpacing: 1,
-                        color: lum(color) > 128 ? '#000' : '#fff',
-                      }}
-                    >
-                      {color.toUpperCase()}
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              {/* BRUSH */}
-              <div className="psec">
-                <div className="ptitle">Brush Settings</div>
-                <div className="srow">
-                  <span className="slabel">Size</span>
-                  <input
-                    type="range"
-                    className="srange"
-                    min={1}
-                    max={80}
-                    value={size}
-                    onChange={(e) => setSize(+e.target.value)}
-                  />
-                  <span className="sval">{size}</span>
-                </div>
-                <div className="srow">
-                  <span className="slabel">Opacity</span>
-                  <input
-                    type="range"
-                    className="srange"
-                    min={5}
-                    max={100}
-                    value={opacity}
-                    onChange={(e) => setOp(+e.target.value)}
-                  />
-                  <span className="sval">{opacity}%</span>
-                </div>
-                <div className="srow">
-                  <span className="slabel">Response</span>
-                  <input
-                    type="range"
-                    className="srange"
-                    min={1}
-                    max={99}
-                    value={smoothStrength}
-                    onChange={(e) => setSmoothStrength(+e.target.value)}
-                  />
-                  <span className="sval">{smoothStrength}%</span>
-                </div>
-                <div className="bpreview">
-                  <canvas
-                    ref={previewRef}
-                    width={220}
-                    height={40}
-                    style={{ width: '100%', height: '100%' }}
-                  />
-                </div>
-              </div>
-
-              {/* HISTORY */}
-              <div className="psec">
-                <div className="ptitle">
-                  History — {histCursor + 1} / {histLen}
-                </div>
-                <div className="history-strip">
-                  {histMgr.current.getAll().map((entry, i) => (
-                    <div
-                      key={i}
-                      className={`hist-thumb ${
-                        i === histCursor
-                          ? 'current'
-                          : i > histCursor
-                          ? 'future'
-                          : ''
-                      }`}
-                      title={`Step ${i + 1}: ${entry.layerOrder
-                        .map((l) => l.name)
-                        .join(', ')}`}
-                      onClick={() => {
-                        // Jump to arbitrary history point
-                        histMgr.current.cursor = i;
-                        restoreEntry(histMgr.current.current());
-                        setHistCursor(i);
-                        composite();
-                        showToast(`Jumped to step ${i + 1}`);
-                      }}
-                    >
-                      <HistThumb
-                        entry={entry}
-                        offscreens={offscreens.current}
-                      />
-                    </div>
-                  ))}
-                </div>
-                <div className="hist-meta">
-                  <span className="hist-info">
-                    {canUndo ? histCursor + ' steps back' : ' At start'}{' '}
-                    {canRedo ? `· ${histLen - 1 - histCursor} forward` : ''}
-                  </span>
-                  <div className="hist-btns">
-                    <button
-                      className="tbtn"
-                      style={{ padding: '3px 8px', fontSize: 10 }}
-                      onClick={undo}
-                      disabled={!canUndo}
-                    >
-                      ↩
-                    </button>
-                    <button
-                      className="tbtn"
-                      style={{ padding: '3px 8px', fontSize: 10 }}
-                      onClick={redo}
-                      disabled={!canRedo}
-                    >
-                      ↪
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              {/* LAYERS */}
-              <div className="psec" style={{ flex: 1 }}>
-                <div className="ptitle">Layers — drag to reorder</div>
-                {displayLayers.map((l, dispIdx) => (
-                  <div key={l.id}>
-                    {/* Drop line above */}
-                    <div
-                      className={`drop-line ${
-                        dragOverIdx === dispIdx && dragLayerId !== l.id
-                          ? 'show'
-                          : ''
-                      }`}
-                    />
-                    <div
-                      className={`litem ${activeId === l.id ? 'active' : ''} ${
-                        dragLayerId === l.id ? 'dragging-self' : ''
-                      } ${
-                        dragOverIdx === dispIdx && dragLayerId !== l.id
-                          ? 'drag-over'
-                          : ''
-                      }`}
-                      draggable
-                      onDragStart={(e) => onLayerDragStart(e, l.id)}
-                      onDragOver={(e) => onLayerDragOver(e, dispIdx)}
-                      onDrop={(e) => onLayerDrop(e, dispIdx)}
-                      onDragEnd={onLayerDragEnd}
-                      onClick={() => setActiveId(l.id)}
-                    >
-                      <span className="ldrag-handle" title="Drag to reorder">
-                        ⠿
-                      </span>
-                      <div className="lthumb">
-                        <canvas
-                          width={30}
-                          height={22}
-                          ref={(el) => {
-                            if (el) layerThumbRefs.current[l.id] = el;
-                          }}
-                          style={{ width: '100%', height: '100%' }}
-                        />
-                      </div>
-                      <span className="lname">{l.name}</span>
-                      <span
-                        className="lvis"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          toggleVis(l.id);
-                        }}
-                      >
-                        {l.visible ? '👁' : '🙈'}
-                      </span>
-                      {layers.length > 1 && (
-                        <span
-                          className="lvis"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            const newLayers = layers.filter(
-                              (x) => x.id !== l.id
-                            );
-                            setLayers(newLayers);
-                            if (activeId === l.id) setActiveId(newLayers[0].id);
-                            setTimeout(() => {
-                              composite();
-                              commitSnapshot();
-                            }, 0);
-                          }}
-                        >
-                          ✕
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                ))}
-                {/* Bottom drop zone */}
-                <div
-                  className={`drop-line ${
-                    dragOverIdx === displayLayers.length && dragLayerId !== null
-                      ? 'show'
-                      : ''
-                  }`}
-                  style={{ marginBottom: 4 }}
-                  onDragOver={(e) => {
-                    e.preventDefault();
-                    setDragOverIdx(displayLayers.length);
-                  }}
-                  onDrop={(e) => onLayerDrop(e, displayLayers.length)}
-                />
-                <button className="ladd" onClick={addLayer}>
-                  + Add Layer
+  return(
+    <>
+      <LoadingOverlay stage={loadStage} tipIdx={tipIdx}/>
+      <div className="app">
+        <header className="topbar">
+          <span className="logo">✦ FINGER PAINT STUDIO</span>
+          <div className="sep"/>
+          <div className="toolbar-tools">
+            {TOOLS.map((t,i)=>(
+              <React.Fragment key={t.id}>
+                {i===3&&<div className="tsep"/>}
+                <button className={`tbtn2 ${tool===t.id?'active':''}`} title={`${t.label} (${t.key})`} onClick={()=>setTool(t.id)}>
+                  <span>{t.icon}</span><span className="tlbl">{t.label}</span>
                 </button>
-              </div>
+              </React.Fragment>
+            ))}
+          </div>
+          <div className="sep"/>
+          <button className="tbtn ur" onClick={undo} disabled={!canUndo} title="Undo (Ctrl+Z)">↩ Undo{canUndo&&<span className="hb">{histCur}</span>}</button>
+          <button className="tbtn ur" onClick={redo} disabled={!canRedo} title="Redo (Ctrl+Y)">Redo ↪{canRedo&&<span className="hb" style={{background:'var(--accent2)'}}>{histLen-1-histCur}</span>}</button>
+          <div className="sep"/>
+          <button className="tbtn danger" onClick={clearAll}>⌫ Clear All</button>
+          <button className="tbtn" onClick={clearLayer}>⌫ Clear Layer</button>
+          <button className="tbtn ok" onClick={exportImg}>↓ Export PNG</button>
+          <div className="spacer"/>
+          <div className="pill" style={{borderColor:sc+'55',color:sc}}><div className="dot" style={{background:sc}}/>{statusLabel}</div>
+          <div className="pill" style={{borderColor:'rgba(247,106,138,.3)',color:'var(--accent2)'}}><span>{activeModeConf.icon}</span><span>{activeModeConf.label}</span></div>
+        </header>
 
-              {/* HAND TRACKING */}
-              <div className="psec">
-                <div className="ptitle">Hand Tracking</div>
-                <div
-                  style={{
-                    fontSize: 10,
-                    color: 'var(--muted)',
-                    marginBottom: 6,
-                  }}
-                >
-                  Drawing hand (positions brush):
-                </div>
-                <div className="htabs" style={{ marginBottom: 14 }}>
-                  {['Left', 'Right'].map((side) => (
-                    <button
-                      key={side}
-                      className={`htab ${drawHand === side ? 'active' : ''}`}
-                      onClick={() => setDrawHand(side)}
-                    >
-                      {side === 'Left' ? '✋' : '🤚'} {side}
-                    </button>
-                  ))}
-                </div>
-                <div
-                  style={{
-                    fontSize: 10,
-                    color: 'var(--muted)',
-                    marginBottom: 7,
-                  }}
-                >
-                  Control gesture:
-                </div>
-                <div className="ctabs">
-                  {CTRL_MODES.map((m) => (
-                    <button
-                      key={m.id}
-                      className={`ctab ${ctrlMode === m.id ? 'active' : ''}`}
-                      onClick={() => setCtrlMode(m.id)}
-                    >
-                      <span className="ctico">{m.icon}</span>
-                      <span className="ctlbl">{m.label}</span>
-                    </button>
-                  ))}
-                </div>
-                <div className="mode-hint">
-                  {activeModeConf.hint.map((line, i) => (
-                    <div key={i}>
-                      {i === 0 ? (
-                        <span style={{ color: 'var(--muted)' }}>{line}</span>
-                      ) : (
-                        <span>{line}</span>
-                      )}
-                    </div>
-                  ))}
-                </div>
-                <div className="gesture-row">
-                  <div
-                    className="gesture-card"
-                    style={{ opacity: handStatus.drawDetected ? 1 : 0.4 }}
-                  >
-                    <div className="gesture-icon">
-                      {drawHand === 'Left' ? '✋' : '🤚'}
-                    </div>
-                    <div className="gesture-label">DRAW HAND</div>
-                    <div
-                      className="gesture-state"
-                      style={{
-                        color: handStatus.drawDetected
-                          ? '#7c6af7'
-                          : 'var(--muted)',
-                      }}
-                    >
-                      {handStatus.drawDetected ? 'Detected' : '—'}
-                    </div>
-                  </div>
-                  <div
-                    className={`gesture-card ${
-                      handStatus.drawing ? 'active-card' : ''
-                    }`}
-                    style={{ opacity: handStatus.ctrlDetected ? 1 : 0.4 }}
-                  >
-                    <div className="gesture-icon">{activeModeConf.icon}</div>
-                    <div className="gesture-label">
-                      {ctrlMode === 'single' ? 'DRAW HAND' : 'CTRL HAND'}
-                    </div>
-                    <div
-                      className="gesture-state"
-                      style={{
-                        color: handStatus.drawing ? '#f76a8a' : 'var(--muted)',
-                      }}
-                    >
-                      {ctrlStateLabel()}
-                    </div>
-                  </div>
-                </div>
-                <div className="trow">
-                  <div
-                    className={`ttrack ${showSkel ? 'on' : ''}`}
-                    onClick={() => setShowSkel((v) => !v)}
-                  >
-                    <div className="tthumb" />
-                  </div>
-                  <span className="tlabel">Show Skeletons</span>
-                </div>
-                {!showCam && (
-                  <button
-                    className="tbtn"
-                    style={{
-                      width: '100%',
-                      justifyContent: 'center',
-                      marginBottom: 8,
-                    }}
-                    onClick={() => setShowCam(true)}
-                  >
-                    📷 Show Camera
-                  </button>
-                )}
-                <div
-                  style={{
-                    marginTop: 10,
-                    fontSize: 10,
-                    color: 'var(--muted)',
-                    lineHeight: 2.1,
-                  }}
-                >
-                  <div>
-                    <span style={{ color: '#7c6af7' }}>Purple</span> → drawing
-                    hand
-                  </div>
-                  {ctrlMode !== 'single' && (
-                    <div>
-                      <span style={{ color: '#f76a8a' }}>Pink</span> → control
-                      hand
-                    </div>
-                  )}
-                  <div>
-                    <span style={{ color: '#f76a8a' }}>
-                      {activeModeConf.icon} {activeModeConf.hint[1]}
-                    </span>
-                  </div>
-                  <div>
-                    <span style={{ color: 'var(--muted)' }}>
-                      {activeModeConf.hint[2]}
-                    </span>
-                  </div>
-                </div>
-              </div>
-            </aside>
+        <main className={`canvas-area ${tool}`} ref={containerRef} onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} onPointerLeave={onUp}>
+          <canvas ref={drawRef} id="drawCanvas"/>
+          <canvas ref={overlayRef} id="overlayCanvas"/>
+          <canvas ref={cursorRef} id="cursorCanvas"/>
+          {showCam?(
+            <div className="pip-wrap" style={{left:pipPos.x,top:pipPos.y,width:pipSize.w,height:pipSize.h}} onMouseDown={onPipMouseDown}>
+              <video ref={videoRef} autoPlay playsInline muted/>
+              <div className="pip-bar"><span className="pip-label">📷 CAM</span><button className="pip-close" onClick={()=>setShowCam(false)}>✕</button></div>
+              <div className={`pip-loading ${modelReady?'gone':''}`}><div className="ms"/>Loading model…</div>
+              <svg className="pip-resize" viewBox="0 0 10 10" onMouseDown={onPipResizeDown}><line x1="3" y1="10" x2="10" y2="3" stroke="white" strokeWidth="1.5"/><line x1="6" y1="10" x2="10" y2="6" stroke="white" strokeWidth="1.5"/></svg>
+            </div>
+          ):(
+            <video ref={videoRef} autoPlay playsInline muted style={{position:'absolute',width:1,height:1,opacity:0,pointerEvents:'none'}}/>
+          )}
+        </main>
 
-            <footer className="statusbar">
-              <div className="si">
-                <div className="sdot" style={{ background: sc }} />
-                {statusLabel}
-              </div>
-              <div className="si">
-                Tool:{' '}
-                <strong style={{ color: 'var(--text)', marginLeft: 4 }}>
-                  {tool}
-                </strong>
-              </div>
-              <div className="si">
-                Mode:{' '}
-                <strong style={{ color: 'var(--accent2)', marginLeft: 4 }}>
-                  {activeModeConf.icon} {ctrlMode}
-                </strong>
-              </div>
-              <div className="si">
-                Draw:{' '}
-                <strong style={{ color: '#7c6af7', marginLeft: 4 }}>
-                  {drawHand}
-                </strong>
-              </div>
-              <div className="si">
-                Ctrl:{' '}
-                <strong
-                  style={{
-                    color: handStatus.drawing ? '#f76a8a' : 'var(--muted)',
-                    marginLeft: 4,
-                  }}
-                >
-                  {ctrlStateLabel()}
-                </strong>
-              </div>
-              <div className="si">
-                History:{' '}
-                <strong style={{ color: 'var(--accent)', marginLeft: 4 }}>
-                  {histCursor + 1}/{histLen}
-                </strong>
-              </div>
-              <div className="si">
-                Layer:{' '}
-                <strong style={{ color: 'var(--text)', marginLeft: 4 }}>
-                  {layers.find((l) => l.id === activeId)?.name || '—'}
-                </strong>
-              </div>
-              <div className="si">
-                {coords.x}, {coords.y}
-              </div>
-              <div style={{ flex: 1 }} />
-              <div className="si" style={{ color: 'var(--accent)' }}>
-                ✦ Finger Paint Studio v2.2
-              </div>
-            </footer>
-
-            {/* Toast */}
-            <div className={`toast ${toast.show ? 'show' : ''}`}>
-              {toast.msg}
+        <aside className="panel">
+          <div className="psec">
+            <div className="ptitle">Color Palette</div>
+            <div className="cgrid">{PALETTE.map(c=>(<div key={c} className={`cswatch ${color===c?'active':''}`} style={{background:c}} onClick={()=>setColor(c)}/>))}</div>
+            <div className="cprow">
+              <span className="cplabel">Custom:</span>
+              <input type="color" className="cpinput" value={color} onChange={e=>setColor(e.target.value)}/>
+              <div className="ccblock" style={{background:color}}><span style={{fontSize:9,fontWeight:600,letterSpacing:1,color:lum(color)>128?'#000':'#fff'}}>{color.toUpperCase()}</span></div>
             </div>
           </div>
-        );
-      }
+          <div className="psec">
+            <div className="ptitle">Brush Settings</div>
+            <div className="srow"><span className="slabel">Size</span><input type="range" className="srange" min={1} max={80} value={size} onChange={e=>setSize(+e.target.value)}/><span className="sval">{size}</span></div>
+            <div className="srow"><span className="slabel">Opacity</span><input type="range" className="srange" min={5} max={100} value={opacity} onChange={e=>setOp(+e.target.value)}/><span className="sval">{opacity}%</span></div>
+            <div className="srow"><span className="slabel">Smooth</span><input type="range" className="srange" min={1} max={99} value={smoothStrength} onChange={e=>setSmoothStrength(+e.target.value)}/><span className="sval">{100-smoothStrength}%</span></div>
+            <div className="bpreview"><canvas ref={previewRef} width={220} height={40} style={{width:'100%',height:'100%'}}/></div>
+          </div>
+          <div className="psec">
+            <div className="ptitle">History — {histCur+1}/{histLen}</div>
+            <div className="hstrip">
+              {hm.current.get().map((entry,i)=>(
+                <div key={i} className={`hthumb ${i===histCur?'cur':i>histCur?'fut':''}`} title={`Step ${i+1}`}
+                  onClick={()=>{hm.current.cur=i;restoreEntry(hm.current.get()[i]);setHistCur(i);composite();showToast(`Step ${i+1}`)}}>
+                  <HThumb entry={entry}/>
+                </div>
+              ))}
+            </div>
+            <div className="hmeta">
+              <span className="hinfo">{canUndo?`${histCur} back`:'At start'}{canRedo?` · ${histLen-1-histCur} fwd`:''}</span>
+              <div className="hbtns">
+                <button className="tbtn" style={{padding:'3px 8px',fontSize:10}} onClick={undo} disabled={!canUndo}>↩</button>
+                <button className="tbtn" style={{padding:'3px 8px',fontSize:10}} onClick={redo} disabled={!canRedo}>↪</button>
+              </div>
+            </div>
+          </div>
+          <div className="psec" style={{flex:1}}>
+            <div className="ptitle">Layers</div>
+            {[...layers].reverse().map(l=>(
+              <div key={l.id} className={`litem ${activeId===l.id?'active':''}`} onClick={()=>setActiveId(l.id)}>
+                <div className="lthumb"/>
+                <span className="lname">{l.name}</span>
+                <span className="lvis" onClick={e=>{e.stopPropagation();toggleVis(l.id)}}>{l.visible?'👁':'🙈'}</span>
+                {layers.length>1&&<span className="lvis" onClick={e=>{e.stopPropagation();const nl=layers.filter(x=>x.id!==l.id);setLayers(nl);if(activeId===l.id)setActiveId(nl[0].id);setTimeout(()=>{composite();commitSnap()},0)}}>✕</span>}
+              </div>
+            ))}
+            <button className="ladd" onClick={addLayer}>+ Add Layer</button>
+          </div>
+          <div className="psec">
+            <div className="ptitle">Hand Tracking</div>
+            <div style={{fontSize:10,color:'var(--muted)',marginBottom:6}}>Drawing hand:</div>
+            <div className="htabs" style={{marginBottom:14}}>
+              {['Left','Right'].map(side=>(<button key={side} className={`htab ${drawHand===side?'active':''}`} onClick={()=>setDrawHand(side)}>{side==='Left'?'✋':'🤚'} {side}</button>))}
+            </div>
+            <div style={{fontSize:10,color:'var(--muted)',marginBottom:7}}>Control gesture:</div>
+            <div className="ctabs">
+              {CTRL_MODES.map(m=>(<button key={m.id} className={`ctab ${ctrlMode===m.id?'active':''}`} onClick={()=>setCtrlMode(m.id)}><span className="ctico">{m.icon}</span><span className="ctlbl">{m.label}</span></button>))}
+            </div>
+            <div className="mode-hint">{activeModeConf.hint.map((line,i)=>(<div key={i}>{i===0?<span style={{color:'var(--muted)'}}>{line}</span>:<span>{line}</span>}</div>))}</div>
+            <div className="gesture-row">
+              <div className="gesture-card" style={{opacity:handStatus.drawDetected?1:.4}}>
+                <div className="gesture-icon">{drawHand==='Left'?'✋':'🤚'}</div>
+                <div className="gesture-label">DRAW HAND</div>
+                <div className="gesture-state" style={{color:handStatus.drawDetected?'#7c6af7':'var(--muted)'}}>{handStatus.drawDetected?'Detected':'—'}</div>
+              </div>
+              <div className={`gesture-card ${handStatus.drawing?'active-card':''}`} style={{opacity:handStatus.ctrlDetected?1:.4}}>
+                <div className="gesture-icon">{activeModeConf.icon}</div>
+                <div className="gesture-label">{ctrlMode==='single'?'DRAW HAND':'CTRL HAND'}</div>
+                <div className="gesture-state" style={{color:handStatus.drawing?'#f76a8a':'var(--muted)'}}>{ctrlStateLabel()}</div>
+              </div>
+            </div>
+            <div className="trow"><div className={`ttrack ${showSkel?'on':''}`} onClick={()=>setShowSkel(v=>!v)}><div className="tthumb"/></div><span className="tlabel">Show Skeletons</span></div>
+            {!showCam&&<button className="tbtn" style={{width:'100%',justifyContent:'center',marginBottom:8}} onClick={()=>setShowCam(true)}>📷 Show Camera</button>}
+            <div style={{marginTop:10,fontSize:10,color:'var(--muted)',lineHeight:2.1}}>
+              <div><span style={{color:'#7c6af7'}}>Purple</span> → drawing hand</div>
+              {ctrlMode!=='single'&&<div><span style={{color:'#f76a8a'}}>Pink</span> → control hand</div>}
+              <div><span style={{color:'#f76a8a'}}>{activeModeConf.icon} {activeModeConf.hint[1]}</span></div>
+              <div><span style={{color:'var(--muted)'}}>{activeModeConf.hint[2]}</span></div>
+            </div>
+          </div>
+        </aside>
 
-      // ── History thumbnail component ───────────────────────────────────────────────
-      function HistThumb({ entry, offscreens }) {
-        const canvasRef = useRef(null);
-        useEffect(() => {
-          const c = canvasRef.current;
-          if (!c) return;
-          const ctx = c.getContext('2d');
-          ctx.clearRect(0, 0, c.width, c.height);
-          if (!entry?.layerOrder) return;
-          for (const meta of entry.layerOrder) {
-            if (!meta.visible) continue;
-            const imgData = entry.layerSnapshots[meta.id];
-            if (!imgData) continue;
-            // Scale ImageData down to thumb size
-            const tmp = document.createElement('canvas');
-            tmp.width = imgData.width;
-            tmp.height = imgData.height;
-            tmp.getContext('2d').putImageData(imgData, 0, 0);
-            ctx.drawImage(tmp, 0, 0, c.width, c.height);
-          }
-        }, [entry]);
-        return (
-          <canvas
-            ref={canvasRef}
-            width={36}
-            height={26}
-            style={{ width: '100%', height: '100%', borderRadius: 3 }}
-          />
-        );
-      }
+        <footer className="statusbar">
+          <div className="si"><div className="sdot" style={{background:sc}}/>{statusLabel}</div>
+          <div className="si">Tool: <strong style={{color:'var(--text)',marginLeft:4}}>{tool}</strong></div>
+          <div className="si">Mode: <strong style={{color:'var(--accent2)',marginLeft:4}}>{activeModeConf.icon} {ctrlMode}</strong></div>
+          <div className="si">Draw: <strong style={{color:'#7c6af7',marginLeft:4}}>{drawHand}</strong></div>
+          <div className="si">Ctrl: <strong style={{color:handStatus.drawing?'#f76a8a':'var(--muted)',marginLeft:4}}>{ctrlStateLabel()}</strong></div>
+          <div className="si">History: <strong style={{color:'var(--accent)',marginLeft:4}}>{histCur+1}/{histLen}</strong></div>
+          <div className="si">Layer: <strong style={{color:'var(--text)',marginLeft:4}}>{layers.find(l=>l.id===activeId)?.name||'—'}</strong></div>
+          <div className="si">{coords.x}, {coords.y}</div>
+          <div style={{flex:1}}/>
+          <div className="si" style={{color:'var(--accent)'}}>✦ Finger Paint Studio v2.1</div>
+        </footer>
+        <div className={`toast ${toast.show?'show':''}`}>{toast.msg}</div>
+      </div>
+    </>
+  );
+}
 
-      ReactDOM.createRoot(document.getElementById('root')).render(<App />);
-    </script>
-  </body>
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+</body>
 </html>
